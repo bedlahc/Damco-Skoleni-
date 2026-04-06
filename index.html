@@ -535,11 +535,6 @@
       <input type="text" class="search-input" placeholder="Hledat název dokumentu…" oninput="filterDocs(this.value)">
       <select class="filter-select" id="doc-cat-filter" onchange="filterDocsByCat(this.value)">
         <option value="">Všechny kategorie</option>
-        <option value="skoleni">🎓 Školení</option>
-        <option value="instrukce">📋 Instrukce</option>
-        <option value="procedury">⚙️ Procedury</option>
-        <option value="bezpecnost">🦺 Bezpečnost</option>
-        <option value="ostatni">📄 Ostatní</option>
       </select>
     </div>
 
@@ -813,11 +808,8 @@
         </div>
         <div class="form-group">
           <label class="form-label">Kategorie *</label>
-          <select class="form-input" id="doc-cat">
-            <option value="skoleni">🎓 Školení</option>
-            <option value="instrukce">📋 Instrukce</option>
-            <option value="procedury">⚙️ Procedury</option>
-            <option value="bezpecnost">🦺 Bezpečnost</option>
+          <select class="form-input" id="doc-cat"></select>
+        </div>
             <option value="ostatni">📄 Ostatní</option>
           </select>
         </div>
@@ -1067,6 +1059,20 @@ function showTypeDetail(typeId) {
   if (!type) return;
   document.getElementById('type-detail-title').textContent = type.icon + ' ' + type.name;
   document.getElementById('type-detail-sub').textContent = 'Opakování každý rok · ' + (type.desc||'');
+
+  // Přidej tlačítko pro nahrání přílohy do hlavičky stránky
+  var pageHeader = document.querySelector('#page-type-detail .page-header');
+  if (pageHeader) {
+    var oldBtn = pageHeader.querySelector('.type-upload-btn');
+    if (oldBtn) oldBtn.remove();
+    var btn = document.createElement('button');
+    btn.className = 'btn btn-ghost type-upload-btn';
+    btn.innerHTML = '📎 Nahrát přílohu';
+    btn.setAttribute('onclick', 'openUploadForType(\''+typeId+'\')');
+    pageHeader.appendChild(btn);
+  }
+
+  // Tabulka zaměstnanců
   var sorted = people.slice().sort(function(a,b){
     var order = {expired:0,expiring:1,missing:2,ok:3};
     return (order[getStatus(a.trainings[typeId])]||0) - (order[getStatus(b.trainings[typeId])]||0);
@@ -1080,13 +1086,59 @@ function showTypeDetail(typeId) {
       +'<td>'+statusBadge(s)+'</td>'
       +'<td><button class="btn btn-ghost btn-sm" onclick="openEditTraining(\''+p.fbKey+'\',\''+typeId+'\')">📎 Aktualizovat</button></td></tr>';
   }).join('');
+
   document.getElementById('page-type-detail').classList.add('active');
+  renderTypeAttachments(typeId);
+}
+
+function renderTypeAttachments(typeId) {
+  var old = document.getElementById('type-attachments-section');
+  if (old) old.remove();
+
+  var typeDocs = _allDocs.filter(function(d){ return d.cat === 'training_'+typeId; });
+  var section = document.createElement('div');
+  section.id = 'type-attachments-section';
+  section.style.marginTop = '24px';
+
+  var docsHtml;
+  if (!typeDocs.length) {
+    docsHtml = '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--card-radius);'
+      +'padding:24px;text-align:center;color:var(--text-muted);">'
+      +'<div style="font-size:32px;margin-bottom:8px;">📂</div>'
+      +'<div style="font-size:13px;">Žádné přílohy — klikněte na <strong>📎 Nahrát přílohu</strong> výše</div></div>';
+  } else {
+    docsHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">'
+      + typeDocs.map(function(d) {
+          var date = d.createdAt ? new Date(d.createdAt).toLocaleDateString('cs-CZ') : '';
+          return '<div class="doc-card" onclick="openDocDetail(\''+d.fbKey+'\')">'
+            +'<div style="display:flex;align-items:center;gap:10px;">'
+              +'<span style="font-size:28px;">'+fileIcon(d.fileName)+'</span>'
+              +'<div style="flex:1;min-width:0;">'
+                +'<div class="doc-card-name" style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+d.name+'</div>'
+                +'<div style="font-size:10px;color:var(--text-muted);">📅 '+date+'</div>'
+              +'</div>'
+            +'</div>'
+            +'<div class="doc-card-actions" onclick="event.stopPropagation()">'
+              +'<button class="btn btn-primary btn-sm" style="flex:1;" onclick="openDocUrl(\''+d.fbKey+'\')">👁 Otevřít</button>'
+              +'<button class="btn btn-ghost btn-sm" onclick="deleteDoc(\''+d.fbKey+'\')">🗑</button>'
+            +'</div></div>';
+        }).join('')
+      +'</div>';
+  }
+
+  section.innerHTML = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:700;'
+    +'color:var(--primary);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">📎 Přílohy a dokumenty ('+typeDocs.length+')</div>'
+    + docsHtml;
+  document.getElementById('page-type-detail').appendChild(section);
 }
 
 function buildSidebarTypes() {
   document.getElementById('type-nav-items').innerHTML = trainingTypes.map(function(t) {
     return '<div class="nav-item" onclick="showTypeDetail(\''+t.id+'\')"><span class="icon">'+t.icon+'</span> '+t.name+'</div>';
   }).join('');
+  // Obnov kategorie dokumentů při změně typů školení
+  buildDocCatSelect('doc-cat-filter', true);
+  buildDocCatSelect('doc-cat', false);
 }
 
 // ─── DASHBOARD ───────────────────────────────────────────
@@ -1214,13 +1266,26 @@ function renderUpcoming() {
 }
 
 // ─── TYPES PAGE ──────────────────────────────────────────
+function getTypeDocCount(typeId) {
+  return _allDocs.filter(function(d){ return d.cat === 'training_'+typeId; }).length;
+}
+
 function renderTypesPage() {
   document.getElementById('type-cards-wrap').innerHTML = trainingTypes.map(function(t) {
+    var docCount = getTypeDocCount(t.id);
     var del = trainingTypes.length > 1 ? '<button class="btn btn-danger btn-xs" onclick="deleteType(\''+t.id+'\')">🗑</button>' : '';
     return '<div class="type-card">'
       +'<div class="type-card-icon">'+t.icon+'</div>'
-      +'<div class="type-card-info"><div class="type-card-name">'+t.name+'</div><div class="type-card-validity">'+(t.desc||'')+' · Platnost 1 rok</div></div>'
-      +'<div class="type-card-actions"><button class="btn btn-ghost btn-xs" onclick="openEditType(\''+t.id+'\')">✏️</button>'+del+'</div>'
+      +'<div class="type-card-info">'
+        +'<div class="type-card-name">'+t.name+'</div>'
+        +'<div class="type-card-validity">'+(t.desc||'')+' · Platnost 1 rok</div>'
+        +(docCount>0 ? '<div style="font-size:11px;color:var(--primary);margin-top:3px;">📎 '+docCount+' příloh</div>' : '')
+      +'</div>'
+      +'<div class="type-card-actions">'
+        +'<button class="btn btn-ghost btn-xs" onclick="openUploadForType(\''+t.id+'\')" title="Nahrát přílohu">📎</button>'
+        +'<button class="btn btn-ghost btn-xs" onclick="openEditType(\''+t.id+'\')">✏️</button>'
+        +del
+      +'</div>'
       +'</div>';
   }).join('');
 }
@@ -1579,19 +1644,61 @@ document.addEventListener('keydown', function(e){
   if (e.key==='Escape') document.querySelectorAll('.modal-bg.open').forEach(function(bg){ bg.classList.remove('open'); });
 });
 
-// ─── DOKUMENTY ───────────────────────────────────────────
+// Otevře upload modal předvyplněný pro konkrétní typ školení
+function openUploadForType(typeId) {
+  var type = trainingTypes.find(function(t){ return t.id === typeId; });
+  if (!type) return;
+  openUploadDoc();
+  // Předvyplň kategorii a název
+  setTimeout(function(){
+    var catSel = document.getElementById('doc-cat');
+    if (catSel) catSel.value = 'training_'+typeId;
+    var nameEl = document.getElementById('doc-name');
+    if (nameEl && !nameEl.value) nameEl.value = type.name+' — ';
+    nameEl.focus();
+  }, 50);
+}
 var _allDocs = [];
 var _docFilterText = '';
 var _docFilterCat  = '';
 var _selectedDocFile = null;
 
-var DOC_CATS = {
-  skoleni:    { label:'Školení',    icon:'🎓' },
-  instrukce:  { label:'Instrukce',  icon:'📋' },
-  procedury:  { label:'Procedury',  icon:'⚙️' },
-  bezpecnost: { label:'Bezpečnost', icon:'🦺' },
-  ostatni:    { label:'Ostatní',    icon:'📄' }
-};
+// Základní pevné kategorie (vždy přítomné)
+var BASE_DOC_CATS = [
+  { id:'instrukce',  label:'Instrukce',  icon:'📋' },
+  { id:'procedury',  label:'Procedury',  icon:'⚙️' },
+  { id:'ostatni',    label:'Ostatní',    icon:'📄' }
+];
+
+// Dynamicky sestaví kategorie = základní + typy školení
+function getDocCats() {
+  var cats = [];
+  // Přidej typy školení jako kategorie
+  trainingTypes.forEach(function(t) {
+    cats.push({ id:'training_'+t.id, label:t.name, icon:t.icon });
+  });
+  // Přidej základní kategorie
+  BASE_DOC_CATS.forEach(function(c) { cats.push(c); });
+  return cats;
+}
+
+// Naplní select element kategoriemi
+function buildDocCatSelect(selectId, includeAll) {
+  var sel = document.getElementById(selectId);
+  if (!sel) return;
+  var cats = getDocCats();
+  var html = includeAll ? '<option value="">Všechny kategorie</option>' : '';
+  html += cats.map(function(c) {
+    return '<option value="'+c.id+'">'+c.icon+' '+c.label+'</option>';
+  }).join('');
+  sel.innerHTML = html;
+}
+
+// Vrátí label+icon pro dané id kategorie
+function getDocCatInfo(catId) {
+  var cats = getDocCats();
+  return cats.find(function(c){ return c.id===catId; }) || { label:'Ostatní', icon:'📄' };
+}
 
 function fileIcon(name) {
   var ext = (name||'').split('.').pop().toLowerCase();
@@ -1607,10 +1714,25 @@ function startDocsSync() {
     _allDocs = data ? Object.keys(data).map(function(k){ var d=data[k]; d.fbKey=k; return d; }) : [];
     _allDocs.sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
     if (_currentPage === 'docs') renderDocs();
+    if (_currentPage === 'types') renderTypesPage();
+    // Obnov přílohy pokud je otevřený detail školení
+    var typeDetail = document.getElementById('page-type-detail');
+    if (typeDetail && typeDetail.classList.contains('active')) {
+      var titleEl = document.getElementById('type-detail-title');
+      if (titleEl) {
+        var typeText = titleEl.textContent;
+        var matchedType = trainingTypes.find(function(t){ return (t.icon+' '+t.name) === typeText; });
+        if (matchedType) renderTypeAttachments(matchedType.id);
+      }
+    }
   });
 }
 
 function renderDocs() {
+  // Aktualizuj filtrovací select pokaždé když se stránka renderuje
+  buildDocCatSelect('doc-cat-filter', true);
+  if (_docFilterCat) document.getElementById('doc-cat-filter').value = _docFilterCat;
+
   var list = _allDocs.slice();
   if (_docFilterText) list = list.filter(function(d){
     return (d.name||'').toLowerCase().indexOf(_docFilterText)>-1
@@ -1629,7 +1751,7 @@ function renderDocs() {
   empty.style.display = 'none';
 
   grid.innerHTML = list.map(function(d) {
-    var cat = DOC_CATS[d.cat] || DOC_CATS.ostatni;
+    var cat = getDocCatInfo(d.cat);
     var personName = '';
     if (d.personFbKey) {
       var p = people.find(function(x){ return x.fbKey===d.personFbKey; });
@@ -1639,9 +1761,7 @@ function renderDocs() {
     return '<div class="doc-card" onclick="openDocDetail(\''+d.fbKey+'\')">'
       +'<div class="doc-card-icon">'+fileIcon(d.fileName)+'</div>'
       +'<div class="doc-card-name">'+d.name+'</div>'
-      +'<div>'
-        +'<span class="doc-card-cat">'+cat.icon+' '+cat.label+'</span>'
-      +'</div>'
+      +'<div><span class="doc-card-cat">'+cat.icon+' '+cat.label+'</span></div>'
       +'<div class="doc-card-meta">'
         +(personName ? '<span>'+personName+'</span>' : '')
         +(d.desc ? '<span>'+d.desc+'</span>' : '')
@@ -1663,11 +1783,13 @@ function openUploadDoc() {
   _selectedDocFile = null;
   document.getElementById('doc-name').value = '';
   document.getElementById('doc-desc').value = '';
-  document.getElementById('doc-cat').value = 'skoleni';
   document.getElementById('doc-upload-text').textContent = 'Klikněte pro výběr souboru nebo přetáhněte sem';
   document.getElementById('doc-progress-wrap').style.display = 'none';
   document.getElementById('doc-progress-bar').style.width = '0%';
   document.getElementById('doc-upload-btn').disabled = false;
+  // Dynamicky naplň kategorie
+  buildDocCatSelect('doc-cat', false);
+  // Naplň zaměstnance
   document.getElementById('doc-person').innerHTML =
     '<option value="">— Obecný dokument —</option>'
     + people.map(function(p){ return '<option value="'+p.fbKey+'">'+p.name+'</option>'; }).join('');
@@ -1750,7 +1872,7 @@ function openDocUrl(fbKey) {
 function openDocDetail(fbKey) {
   var d = _allDocs.find(function(x){ return x.fbKey===fbKey; });
   if (!d) return;
-  var cat = DOC_CATS[d.cat] || DOC_CATS.ostatni;
+  var cat = getDocCatInfo(d.cat);
   var personName = '';
   if (d.personFbKey) {
     var p = people.find(function(x){ return x.fbKey===d.personFbKey; });
@@ -1907,7 +2029,8 @@ window.setTrainingMode  = setTrainingMode;
 window.selectAllPeople  = selectAllPeople;
 window.updateSelectedCount = updateSelectedCount;
 window.printCard        = printCard;
-window.openUploadDoc    = openUploadDoc;
+window.openUploadForType = openUploadForType;
+window.renderTypeAttachments = renderTypeAttachments;
 window.onDocFileSelected= onDocFileSelected;
 window.uploadDocument   = uploadDocument;
 window.openDocUrl       = openDocUrl;
