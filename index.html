@@ -4,9 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Damco Jaroměř — Správa školení</title>
-<!-- Firebase compat CDN -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   /* ── MAERSK COLOUR PALETTE ── */
@@ -493,7 +490,7 @@
 
 <!-- ============= MODAL: ADD TRAINING ============= -->
 <div class="modal-bg" id="modal-training">
-  <div class="modal">
+  <div class="modal" style="max-width:700px;">
     <div class="modal-header">
       <div class="modal-title">Přidat / Aktualizovat školení</div>
       <button class="modal-close" onclick="closeModal('modal-training')">✕</button>
@@ -501,14 +498,10 @@
     <div class="modal-body">
       <div class="form-grid">
         <div class="form-group">
-          <label class="form-label">Zaměstnanec *</label>
-          <select class="form-input" id="t-person"><option value="">— vyberte osobu —</option></select>
-        </div>
-        <div class="form-group">
           <label class="form-label">Typ školení *</label>
           <select class="form-input" id="t-type"></select>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="t-date-group">
           <label class="form-label">Datum absolvování *</label>
           <input type="date" class="form-input" id="t-date">
         </div>
@@ -520,28 +513,51 @@
           <label class="form-label">Číslo osvědčení</label>
           <input type="text" class="form-input" id="t-cert" placeholder="např. BEZ-2025-001">
         </div>
-        <div class="form-group">
-          <label class="form-label">Platnost</label>
-          <div class="form-input" style="background:var(--bg3);color:var(--text-muted);">1 rok (pevně)</div>
-        </div>
+
         <div class="form-group full">
-          <label class="form-label">Nahrát certifikát / protokol</label>
-          <div class="upload-zone">
-            <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onchange="handleFileUpload(event,'training-files')">
-            <div class="upload-icon">📄</div>
-            <div class="upload-text">Přetáhněte nebo <strong>klikněte</strong></div>
-            <div class="upload-meta">PDF, JPG, PNG — max. 10 MB</div>
+          <label class="form-label">Přiřadit školení</label>
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+            <button type="button" id="btn-mode-all" onclick="setTrainingMode('all')"
+              style="padding:7px 14px;border-radius:7px;border:2px solid var(--primary);background:var(--primary);color:#fff;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">
+              ✅ Všichni — stejné datum
+            </button>
+            <button type="button" id="btn-mode-select" onclick="setTrainingMode('select')"
+              style="padding:7px 14px;border-radius:7px;border:2px solid var(--border);background:transparent;color:var(--text-muted);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">
+              👤 Výběr — stejné datum
+            </button>
+            <button type="button" id="btn-mode-individual" onclick="setTrainingMode('individual')"
+              style="padding:7px 14px;border-radius:7px;border:2px solid var(--border);background:transparent;color:var(--text-muted);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">
+              📅 Individuální data
+            </button>
           </div>
-          <div class="file-list" id="training-files"></div>
+
+          <div id="t-person-list" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;max-height:300px;overflow-y:auto;">
+            <div id="t-list-controls" style="display:flex;gap:8px;margin-bottom:10px;">
+              <button type="button" onclick="selectAllPeople(true)"
+                style="padding:4px 12px;border-radius:6px;border:1px solid var(--border);background:var(--primary);color:#fff;font-size:12px;font-family:'Barlow Condensed',sans-serif;font-weight:700;cursor:pointer;">
+                Vybrat vše
+              </button>
+              <button type="button" onclick="selectAllPeople(false)"
+                style="padding:4px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:12px;font-family:'Barlow Condensed',sans-serif;font-weight:700;cursor:pointer;">
+                Zrušit výběr
+              </button>
+            </div>
+            <div id="t-person-checkboxes"></div>
+          </div>
         </div>
+
         <div class="form-group full">
           <label class="form-label">Poznámka</label>
           <textarea class="form-input" id="t-note" rows="2" placeholder="Volitelná poznámka…" style="resize:vertical;"></textarea>
         </div>
       </div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
-        <button class="btn btn-ghost" onclick="closeModal('modal-training')">Zrušit</button>
-        <button class="btn btn-primary" onclick="saveTraining()">Uložit školení</button>
+
+      <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:20px;flex-wrap:wrap;">
+        <div id="t-selected-count" style="font-size:13px;color:var(--text-muted);"></div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-ghost" onclick="closeModal('modal-training')">Zrušit</button>
+          <button class="btn btn-primary" onclick="saveTraining()">💾 Uložit školení</button>
+        </div>
       </div>
     </div>
   </div>
@@ -587,16 +603,31 @@
 <div class="notif" id="notif"></div>
 
 
+
 <script>
 // ════════════════════════════════════════════════════════
 //  DAMCO JAROMĚŘ — Správa školení
-//  Firebase Realtime Database (compat v9)
 // ════════════════════════════════════════════════════════
 
-// Firebase je načten v <head> přes CDN script tagy
-// Inicializace probíhá ihned — žádný wrapper
+// Dynamické načtení Firebase — garantuje správné pořadí
+function loadScript(src, cb) {
+  var s = document.createElement('script');
+  s.src = src;
+  s.onload = cb;
+  s.onerror = function(){ alert('Chyba načítání Firebase. Zkontroluj připojení k internetu.'); };
+  document.head.appendChild(s);
+}
 
-const firebaseConfig = {
+loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js', function() {
+  loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js', function() {
+    // Firebase je načten — teď inicializujeme
+    initApp();
+  });
+});
+
+function initApp() {
+
+var firebaseConfig = {
   apiKey: "AIzaSyCngZ7woRCjNJKJozrz3091FJQRMweINdY",
   authDomain: "damco-jaromer-skoleni.firebaseapp.com",
   databaseURL: "https://damco-jaromer-skoleni-default-rtdb.europe-west1.firebasedatabase.app",
@@ -1012,37 +1043,163 @@ function deletePerson() {
   }).catch(function(e){ showNotif('❌ Chyba: '+e.message,true); });
 }
 
-// ADD TRAINING
+// ADD TRAINING — 3 režimy
+var _trainingMode = 'all';
+
+function _setModeBtn(active) {
+  ['all','select','individual'].forEach(function(m) {
+    var btn = document.getElementById('btn-mode-'+m);
+    if (!btn) return;
+    if (m === active) {
+      btn.style.background = 'var(--primary)';
+      btn.style.color = '#fff';
+      btn.style.borderColor = 'var(--primary)';
+    } else {
+      btn.style.background = 'transparent';
+      btn.style.color = 'var(--text-muted)';
+      btn.style.borderColor = 'var(--border)';
+    }
+  });
+}
+
+function setTrainingMode(mode) {
+  _trainingMode = mode;
+  _setModeBtn(mode);
+
+  var listEl   = document.getElementById('t-person-list');
+  var dateGrp  = document.getElementById('t-date-group');
+  var controls = document.getElementById('t-list-controls');
+
+  if (mode === 'all') {
+    listEl.style.display  = 'none';
+    dateGrp.style.display = '';
+    document.getElementById('t-selected-count').textContent =
+      'Bude aplikováno na všechny ('+people.length+') zaměstnance';
+
+  } else if (mode === 'select') {
+    listEl.style.display  = 'block';
+    dateGrp.style.display = '';
+    controls.style.display = 'flex';
+    // Checkboxy bez date inputů
+    document.getElementById('t-person-checkboxes').innerHTML = people.map(function(p) {
+      return '<label style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--border);cursor:pointer;">'
+        +'<input type="checkbox" class="t-person-cb" value="'+p.fbKey+'" onchange="updateSelectedCount()"'
+        +' style="width:16px;height:16px;accent-color:var(--primary);cursor:pointer;">'
+        +'<div class="avatar" style="width:28px;height:28px;font-size:11px;">'+initials(p.name)+'</div>'
+        +'<div><div style="font-weight:600;font-size:13px;color:var(--text);">'+p.name+'</div>'
+        +'<div style="font-size:11px;color:var(--text-muted);">'+p.role+'</div></div>'
+        +'</label>';
+    }).join('');
+    updateSelectedCount();
+
+  } else if (mode === 'individual') {
+    listEl.style.display  = 'block';
+    dateGrp.style.display = 'none'; // globální datum schováme
+    controls.style.display = 'none';
+    // Každý zaměstnanec má vlastní date input
+    document.getElementById('t-person-checkboxes').innerHTML = people.map(function(p) {
+      var existing = (p.trainings && p.trainings[document.getElementById('t-type').value]) || '';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--border);">'
+        +'<div class="avatar" style="width:28px;height:28px;font-size:11px;flex-shrink:0;">'+initials(p.name)+'</div>'
+        +'<div style="flex:1;"><div style="font-weight:600;font-size:13px;color:var(--text);">'+p.name+'</div>'
+        +'<div style="font-size:11px;color:var(--text-muted);">'+p.role+'</div></div>'
+        +'<input type="date" class="form-input t-indiv-date" data-fbkey="'+p.fbKey+'" value="'+existing+'"'
+        +' style="width:160px;padding:6px 10px;font-size:13px;" placeholder="Nevyplněno">'
+        +'</div>';
+    }).join('');
+    document.getElementById('t-selected-count').textContent =
+      'Zadejte datum pro každého zaměstnance (prázdné = přeskočit)';
+  }
+}
+
+function updateSelectedCount() {
+  var checked = document.querySelectorAll('.t-person-cb:checked').length;
+  document.getElementById('t-selected-count').textContent =
+    'Vybráno: '+checked+' z '+people.length+' zaměstnanců';
+}
+
+function selectAllPeople(val) {
+  document.querySelectorAll('.t-person-cb').forEach(function(cb){ cb.checked = val; });
+  updateSelectedCount();
+}
+
 function openAddTraining() {
-  document.getElementById('t-person').innerHTML = '<option value="">— vyberte osobu —</option>'
-    + people.map(function(p){ return '<option value="'+p.fbKey+'">'+p.name+'</option>'; }).join('');
+  _trainingMode = 'all';
   document.getElementById('t-type').innerHTML = trainingTypes.map(function(t){
     return '<option value="'+t.id+'">'+t.icon+' '+t.name+'</option>';
   }).join('');
-  document.getElementById('training-files').innerHTML='';
-  ['t-date','t-instructor','t-cert','t-note'].forEach(function(id){ var el=document.getElementById(id); if(el)el.value=''; });
+  ['t-date','t-instructor','t-cert','t-note'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.value = '';
+  });
+  document.getElementById('t-person-list').style.display = 'none';
+  document.getElementById('t-date-group').style.display = '';
+  document.getElementById('t-person-checkboxes').innerHTML = '';
+  _setModeBtn('all');
+  document.getElementById('t-selected-count').textContent =
+    'Bude aplikováno na všechny ('+people.length+') zaměstnance';
   openModal('modal-training');
 }
 
 function openEditTraining(fbKey, preselect) {
   openAddTraining();
-  document.getElementById('t-person').value = fbKey;
   if (preselect) document.getElementById('t-type').value = preselect;
+  setTrainingMode('select');
+  // Zaškrtni konkrétní osobu
+  setTimeout(function(){
+    var cb = document.querySelector('.t-person-cb[value="'+fbKey+'"]');
+    if (cb) { cb.checked = true; updateSelectedCount(); }
+  }, 0);
 }
 
 function saveTraining() {
-  var fbKey = document.getElementById('t-person').value;
-  var type  = document.getElementById('t-type').value;
-  var date  = document.getElementById('t-date').value;
-  if (!fbKey||!date) { showNotif('Vyplňte osobu a datum',true); return; }
-  var person = people.find(function(p){ return p.fbKey===fbKey; });
-  if (!person) return;
-  if (!person.trainings) person.trainings = {};
-  person.trainings[type] = date;
-  db.ref('people/'+fbKey).set(person).then(function(){
+  var type = document.getElementById('t-type').value;
+  var date = document.getElementById('t-date') ? document.getElementById('t-date').value : '';
+  var updates = {};
+  var count = 0;
+
+  if (_trainingMode === 'all') {
+    if (!date) { showNotif('Vyplňte datum absolvování', true); return; }
+    people.forEach(function(p) {
+      if (!p.trainings) p.trainings = {};
+      p.trainings[type] = date;
+      updates['people/'+p.fbKey] = p;
+      count++;
+    });
+
+  } else if (_trainingMode === 'select') {
+    if (!date) { showNotif('Vyplňte datum absolvování', true); return; }
+    var checked = document.querySelectorAll('.t-person-cb:checked');
+    if (!checked.length) { showNotif('Vyberte alespoň jednoho zaměstnance', true); return; }
+    checked.forEach(function(cb) {
+      var p = people.find(function(x){ return x.fbKey === cb.value; });
+      if (!p) return;
+      if (!p.trainings) p.trainings = {};
+      p.trainings[type] = date;
+      updates['people/'+p.fbKey] = p;
+      count++;
+    });
+
+  } else if (_trainingMode === 'individual') {
+    var inputs = document.querySelectorAll('.t-indiv-date');
+    var hasAny = false;
+    inputs.forEach(function(inp) {
+      if (!inp.value) return; // prázdné přeskočíme
+      hasAny = true;
+      var p = people.find(function(x){ return x.fbKey === inp.dataset.fbkey; });
+      if (!p) return;
+      if (!p.trainings) p.trainings = {};
+      p.trainings[type] = inp.value;
+      updates['people/'+p.fbKey] = p;
+      count++;
+    });
+    if (!hasAny) { showNotif('Zadejte alespoň jedno datum', true); return; }
+  }
+
+  db.ref().update(updates).then(function(){
     closeModal('modal-training');
-    showNotif('✅ Školení uloženo');
-  }).catch(function(e){ showNotif('❌ Chyba: '+e.message,true); });
+    var typeName = (trainingTypes.find(function(t){return t.id===type;})||{}).name || type;
+    showNotif('✅ Školení uloženo pro '+count+' zaměstnanců ('+typeName+')');
+  }).catch(function(e){ showNotif('❌ Chyba: '+e.message, true); });
 }
 
 // TRAINING TYPES
@@ -1147,7 +1304,35 @@ document.addEventListener('keydown', function(e){
 document.getElementById('todayDate').textContent =
   today.toLocaleDateString('cs-CZ',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 
+// Zpřístupni funkce globálně
+window.showPage         = showPage;
+window.showTypeDetail   = showTypeDetail;
+window.openAddPerson    = openAddPerson;
+window.openEditPerson   = openEditPerson;
+window.openAddTraining  = openAddTraining;
+window.openEditTraining = openEditTraining;
+window.openAddType      = openAddType;
+window.openEditType     = openEditType;
+window.deleteType       = deleteType;
+window.deletePerson     = deletePerson;
+window.savePerson       = savePerson;
+window.saveTraining     = saveTraining;
+window.updatePerson     = updatePerson;
+window.saveType         = saveType;
+window.openModal        = openModal;
+window.closeModal       = closeModal;
+window.selectIcon       = selectIcon;
+window.selectColor      = selectColor;
+window.handleFileUpload = handleFileUpload;
+window.filterPeople     = filterPeople;
+window.filterByStatus   = filterByStatus;
+window.setTrainingMode  = setTrainingMode;
+window.selectAllPeople  = selectAllPeople;
+window.updateSelectedCount = updateSelectedCount;
+
 startLiveSync();
+
+} // konec initApp()
 </script>
 </body>
 </html>
