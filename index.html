@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Damco Jaroměř — Správa školení</title>
+<title>MAERSK Jaroměř — Správa školení</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   /* ── MAERSK COLOUR PALETTE ── */
@@ -34,19 +34,41 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+
+  /* VODOZNAK — bezpečnostní prvky na pozadí */
+  body {
+    font-family: 'Barlow', sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    background-color: var(--bg);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Ctext x='30' y='80' font-size='52' opacity='0.045' fill='%230073AB'%3E🦺%3C/text%3E%3Ctext x='180' y='60' font-size='38' opacity='0.035' fill='%230073AB'%3E⛑%3C/text%3E%3Ctext x='310' y='90' font-size='44' opacity='0.04' fill='%230073AB'%3E🚒%3C/text%3E%3Ctext x='10' y='180' font-size='40' opacity='0.035' fill='%230073AB'%3E🧯%3C/text%3E%3Ctext x='150' y='170' font-size='48' opacity='0.04' fill='%230073AB'%3E🚢%3C/text%3E%3Ctext x='320' y='200' font-size='36' opacity='0.035' fill='%230073AB'%3E🛡%3C/text%3E%3Ctext x='60' y='280' font-size='42' opacity='0.04' fill='%230073AB'%3E🚛%3C/text%3E%3Ctext x='210' y='270' font-size='36' opacity='0.035' fill='%230073AB'%3E⚠%3C/text%3E%3Ctext x='340' y='290' font-size='44' opacity='0.04' fill='%230073AB'%3E🔒%3C/text%3E%3Ctext x='20' y='380' font-size='38' opacity='0.035' fill='%230073AB'%3E🏗%3C/text%3E%3Ctext x='170' y='370' font-size='44' opacity='0.04' fill='%230073AB'%3E📋%3C/text%3E%3Ctext x='310' y='390' font-size='40' opacity='0.035' fill='%230073AB'%3E🧤%3C/text%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 420px 420px;
+  }
 
   /* HEADER */
   header {
-    background: var(--primary);
-    border-bottom: 3px solid var(--accent);
+    background: linear-gradient(135deg, #004B6E 0%, #0073AB 60%, #00A0D2 100%);
+    border-bottom: 3px solid #7FDFFF;
     padding: 0 32px;
     display: flex; align-items: center; justify-content: space-between;
-    height: 64px; position: sticky; top: 0; z-index: 100;
-    box-shadow: 0 2px 12px rgba(0,80,130,0.18);
+    height: 80px; position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 16px rgba(0,60,100,0.28);
+    overflow: hidden;
   }
-  .logo { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 22px; letter-spacing: 2px; text-transform: uppercase; color: #fff; }
-  .logo span { color: #7FDFFF; }
+  header::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: url("data:image/svg+xml,%3Csvg width='600' height='80' viewBox='0 0 600 80' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='520' cy='40' r='60' fill='rgba(255,255,255,0.03)'/%3E%3Ccircle cx='560' cy='20' r='40' fill='rgba(255,255,255,0.04)'/%3E%3C/svg%3E") right center no-repeat;
+    pointer-events: none;
+  }
+  .logo-wrap { display: flex; align-items: center; gap: 14px; position: relative; }
+  .logo-icons { display: flex; gap: 6px; align-items: center; opacity: 0.85; }
+  .logo-icons span { font-size: 22px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3)); }
+  .logo { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 24px; letter-spacing: 2px; text-transform: uppercase; color: #fff; line-height: 1.1; }
+  .logo-sub { font-family: 'Barlow', sans-serif; font-size: 11px; color: rgba(255,255,255,0.7); letter-spacing: 1.5px; text-transform: uppercase; font-weight: 400; margin-top: 1px; }
+  .logo em { color: #7FDFFF; font-style: normal; }
   .header-meta { font-size: 11px; color: rgba(255,255,255,0.75); text-align: right; line-height: 1.6; }
   .header-btns { display: flex; gap: 10px; align-items: center; }
 
@@ -62,7 +84,7 @@
   .alert-chip.soon { background: rgba(176,120,0,0.1); border-color: rgba(176,120,0,0.35); color: #7A5500; }
 
   /* LAYOUT */
-  .main-wrap { display: grid; grid-template-columns: 260px 1fr; min-height: calc(100vh - 108px); }
+  .main-wrap { display: grid; grid-template-columns: 260px 1fr; min-height: calc(100vh - 124px); }
 
   /* SIDEBAR */
   sidebar {
@@ -237,13 +259,133 @@
     .stats-row { grid-template-columns: 1fr 1fr; }
     .form-grid { grid-template-columns: 1fr; }
   }
+
+  /* ── TISK KARTY ZAMĚSTNANCE ── */
+  @media print {
+    body * { visibility: hidden !important; }
+    #print-card, #print-card * { visibility: visible !important; }
+    #print-card {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100% !important;
+      height: auto !important;
+      background: #fff !important;
+      z-index: 99999 !important;
+      padding: 0 !important;
+      margin: 0 !important;
+    }
+  }
+
+  /* KARTA — vzhled */
+  #print-card {
+    display: none;
+    font-family: 'Barlow', sans-serif;
+  }
+  .pc-wrap {
+    background: #fff;
+    width: 210mm;
+    min-height: 148mm;
+    padding: 14mm 16mm;
+    margin: 0 auto;
+    box-sizing: border-box;
+    color: #1A2E3B;
+  }
+  .pc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 3px solid #0073AB;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+  }
+  .pc-logo {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: #0073AB;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .pc-logo span { color: #00A0D2; }
+  .pc-logo-sub { font-size: 10px; color: #5E8098; letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+  .pc-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #5E8098;
+    text-align: right;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .pc-person {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #EDF4F8;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+  }
+  .pc-avatar {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: #0073AB;
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 20px; font-weight: 800;
+    flex-shrink: 0;
+  }
+  .pc-name { font-size: 22px; font-weight: 700; color: #0073AB; font-family: 'Barlow Condensed', sans-serif; text-transform: uppercase; letter-spacing: 1px; }
+  .pc-meta { font-size: 12px; color: #5E8098; margin-top: 3px; }
+  .pc-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  .pc-table th {
+    background: #0073AB;
+    color: #fff;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 8px 12px;
+    text-align: left;
+  }
+  .pc-table td { padding: 8px 12px; border-bottom: 1px solid #C5DCE9; font-size: 12px; vertical-align: middle; }
+  .pc-table tr:last-child td { border-bottom: none; }
+  .pc-table tr:nth-child(even) td { background: #F5FAFE; }
+  .pc-status-ok     { color: #1A7A3A; font-weight: 700; }
+  .pc-status-warn   { color: #B8860B; font-weight: 700; }
+  .pc-status-bad    { color: #C0392B; font-weight: 700; }
+  .pc-status-miss   { color: #888; }
+  .pc-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-top: 1px solid #C5DCE9;
+    padding-top: 10px;
+    margin-top: 6px;
+  }
+  .pc-sign { text-align: center; }
+  .pc-sign-line { width: 140px; border-top: 1px solid #1A2E3B; margin: 0 auto 4px; }
+  .pc-sign-label { font-size: 10px; color: #5E8098; }
+  .pc-generated { font-size: 10px; color: #aaa; }
 </style>
 </head>
 <body>
 
 <!-- HEADER -->
 <header>
-  <div class="logo"><span>Damco</span> Jaroměř</div>
+  <div class="logo-wrap">
+    <div class="logo-icons">
+      <span title="Kontejnerová loď">🚢</span>
+      <span title="Kamion">🚛</span>
+      <span title="Bezpečnost">🦺</span>
+    </div>
+    <div>
+      <div class="logo"><em>MAERSK</em> Jaroměř</div>
+      <div class="logo-sub">Správa školení zaměstnanců</div>
+    </div>
+  </div>
   <div class="header-btns">
     <button class="btn" onclick="showPage('types',null)" style="font-size:13px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);">⚙️ Typy školení</button>
     <button class="btn" onclick="openAddPerson()" style="background:#fff;color:var(--primary);font-weight:800;">+ Přidat osobu</button>
@@ -280,7 +422,7 @@
   <!-- DASHBOARD -->
   <div class="page active" id="page-dashboard">
     <div class="page-header">
-      <div><div class="page-title">Dashboard</div><div class="page-subtitle">Damco Jaroměř — přehled školení zaměstnanců</div></div>
+      <div><div class="page-title">Dashboard</div><div class="page-subtitle">MAERSK Jaroměř — přehled školení zaměstnanců</div></div>
     </div>
     <div class="stats-row">
       <div class="stat-card ok"><div class="stat-number" id="stat-ok">—</div><div class="stat-label">✅ Platných školení</div></div>
@@ -600,6 +742,9 @@
   </div>
 </div>
 
+<!-- TISKOVÁ KARTA -->
+<div id="print-card"></div>
+
 <div class="notif" id="notif"></div>
 
 
@@ -894,7 +1039,8 @@ function renderPeople() {
       +'<td><div class="prog-wrap">'+segs+'</div></td>'
       +'<td style="white-space:nowrap;">'
       +'<button class="btn btn-ghost btn-sm" onclick="openEditPerson(\''+p.fbKey+'\')" style="margin-right:4px;">✏️ Upravit</button>'
-      +'<button class="btn btn-ghost btn-sm" onclick="openEditTraining(\''+p.fbKey+'\')">➕ Školení</button>'
+      +'<button class="btn btn-ghost btn-sm" onclick="openEditTraining(\''+p.fbKey+'\')" style="margin-right:4px;">➕ Školení</button>'
+      +'<button class="btn btn-ghost btn-sm" onclick="printCard(\''+p.fbKey+'\')" style="color:var(--primary);border-color:var(--primary);">🖨️ Tisk</button>'
       +'</td></tr>';
   }).join('');
 }
@@ -1300,7 +1446,93 @@ document.addEventListener('keydown', function(e){
   if (e.key==='Escape') document.querySelectorAll('.modal-bg.open').forEach(function(bg){ bg.classList.remove('open'); });
 });
 
-// ─── INIT ────────────────────────────────────────────────
+// ─── TISK KARTY ZAMĚSTNANCE ──────────────────────────────
+function printCard(fbKey) {
+  var p = people.find(function(x){ return x.fbKey === fbKey; });
+  if (!p) return;
+  normalizeTrainings();
+
+  var statusMap = {
+    ok:       '<span class="pc-status-ok">✅ Platné</span>',
+    expiring: '<span class="pc-status-warn">⏳ Brzy expiruje</span>',
+    expired:  '<span class="pc-status-bad">❌ Prošlé</span>',
+    missing:  '<span class="pc-status-miss">— Chybí</span>'
+  };
+
+  var rows = trainingTypes.map(function(t) {
+    var date = p.trainings[t.id] || null;
+    var s    = getStatus(date);
+    var exp  = date ? addYears(date, VALIDITY_YEARS) : null;
+    var diff = exp ? daysDiff(exp) : null;
+    var daysStr = '';
+    if (diff !== null) {
+      daysStr = diff < 0
+        ? '<span class="pc-status-bad">('+Math.abs(diff)+' dní po splatnosti)</span>'
+        : '<span style="color:#5E8098;">(za '+diff+' dní)</span>';
+    }
+    return '<tr>'
+      +'<td>'+t.icon+' <strong>'+t.name+'</strong></td>'
+      +'<td>'+(date ? fmtDate(date) : '—')+'</td>'
+      +'<td>'+(exp ? exp.toLocaleDateString('cs-CZ') : '—')+' '+daysStr+'</td>'
+      +'<td>'+(statusMap[s]||'—')+'</td>'
+      +'</tr>';
+  }).join('');
+
+  var now = new Date().toLocaleDateString('cs-CZ', {day:'2-digit',month:'2-digit',year:'numeric'});
+
+  document.getElementById('print-card').innerHTML =
+    '<div class="pc-wrap">'
+    // Hlavička
+    +'<div class="pc-header">'
+      +'<div>'
+        +'<div class="pc-logo"><span>MAERSK</span> Jaroměř</div>'
+        +'<div class="pc-logo-sub">🚢 &nbsp; 🚛 &nbsp; 🦺 &nbsp; Správa školení</div>'
+      +'</div>'
+      +'<div class="pc-title">Karta školení zaměstnance<br>Datum tisku: '+now+'</div>'
+    +'</div>'
+    // Zaměstnanec
+    +'<div class="pc-person">'
+      +'<div class="pc-avatar">'+initials(p.name)+'</div>'
+      +'<div>'
+        +'<div class="pc-name">'+p.name+'</div>'
+        +'<div class="pc-meta">'
+          +(p.role ? '📋 '+p.role : '')
+          +(p.dept ? ' &nbsp;·&nbsp; 🏭 '+p.dept : '')
+          +(p.email ? ' &nbsp;·&nbsp; ✉️ '+p.email : '')
+          +(p.startDate ? ' &nbsp;·&nbsp; 📅 Nástup: '+fmtDate(p.startDate) : '')
+        +'</div>'
+        +(p.note ? '<div style="font-size:11px;color:#888;margin-top:4px;">📝 '+p.note+'</div>' : '')
+      +'</div>'
+    +'</div>'
+    // Tabulka školení
+    +'<table class="pc-table">'
+      +'<thead><tr>'
+        +'<th>Typ školení</th>'
+        +'<th>Datum absolvování</th>'
+        +'<th>Platnost do</th>'
+        +'<th>Stav</th>'
+      +'</tr></thead>'
+      +'<tbody>'+rows+'</tbody>'
+    +'</table>'
+    // Patička s podpisy
+    +'<div class="pc-footer">'
+      +'<div class="pc-sign">'
+        +'<div class="pc-sign-line"></div>'
+        +'<div class="pc-sign-label">Podpis zaměstnance</div>'
+      +'</div>'
+      +'<div class="pc-sign">'
+        +'<div class="pc-sign-line"></div>'
+        +'<div class="pc-sign-label">Podpis odpovědné osoby</div>'
+      +'</div>'
+      +'<div class="pc-generated">Vygenerováno: MAERSK Jaroměř — Správa školení</div>'
+    +'</div>'
+    +'</div>';
+
+  document.getElementById('print-card').style.display = 'block';
+  window.print();
+  document.getElementById('print-card').style.display = 'none';
+  document.getElementById('print-card').innerHTML = '';
+}
 document.getElementById('todayDate').textContent =
   today.toLocaleDateString('cs-CZ',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 
@@ -1329,6 +1561,7 @@ window.filterByStatus   = filterByStatus;
 window.setTrainingMode  = setTrainingMode;
 window.selectAllPeople  = selectAllPeople;
 window.updateSelectedCount = updateSelectedCount;
+window.printCard        = printCard;
 
 startLiveSync();
 
