@@ -586,10 +586,16 @@
 
 <div class="notif" id="notif"></div>
 
-<script>
-window.addEventListener('load', function() {
 
-// ─── FIREBASE SETUP ───────────────────────────────────────────────────
+<script>
+// ════════════════════════════════════════════════════════
+//  DAMCO JAROMĚŘ — Správa školení
+//  Firebase Realtime Database (compat v9)
+// ════════════════════════════════════════════════════════
+
+// Firebase je načten v <head> přes CDN script tagy
+// Inicializace probíhá ihned — žádný wrapper
+
 const firebaseConfig = {
   apiKey: "AIzaSyCngZ7woRCjNJKJozrz3091FJQRMweINdY",
   authDomain: "damco-jaromer-skoleni.firebaseapp.com",
@@ -601,87 +607,133 @@ const firebaseConfig = {
 };
 
 firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+var db = firebase.database();
 
-// ─── LOADING OVERLAY ──────────────────────────────────────────────────
+// ─── DATA ────────────────────────────────────────────────
+var trainingTypes = [];
+var people = [];
+var _currentPage = 'dashboard';
+var _filterText = '';
+var _filterStatus = '';
+var editingTypeId = null;
+
+var VALIDITY_YEARS = 1;
+var today = new Date(); today.setHours(0,0,0,0);
+
+var DEFAULT_TYPES = [
+  { id:'bezpecnost', name:'Bezpečnost',    icon:'🦺', color:'#DA3633', desc:'BOZP školení' },
+  { id:'vozik',      name:'Řízení vozíků', icon:'🏗️', color:'#388BFD', desc:'Řidičské oprávnění VZV' },
+  { id:'instrukce',  name:'Instrukce',     icon:'📋', color:'#2EA043', desc:'Pracovní instrukce' }
+];
+
+var ICONS  = ['🦺','🏗️','📋','🔥','⚡','🚗','🏥','🔒','📐','🧯','🛡️','📝','🔧','🚧','🌡️','💊','🧪','📡'];
+var COLORS = ['#DA3633','#388BFD','#2EA043','#D29922','#E8500A','#8957E5','#F78166','#39D353','#58A6FF','#DB61A2'];
+
+// ─── HELPERS ─────────────────────────────────────────────
+function addYears(dateStr, y) {
+  if (!dateStr) return null;
+  var d = new Date(dateStr);
+  d.setFullYear(d.getFullYear() + y);
+  return d;
+}
+function daysDiff(d) { return d ? Math.round((d - today) / 86400000) : null; }
+function fmtDate(s) { if (!s) return '—'; return new Date(s).toLocaleDateString('cs-CZ'); }
+function initials(n) { return n.split(' ').map(function(w){return w[0];}).join('').substring(0,2).toUpperCase(); }
+
+function getStatus(dateStr) {
+  if (!dateStr) return 'missing';
+  var exp = addYears(dateStr, VALIDITY_YEARS);
+  var diff = daysDiff(exp);
+  if (diff < 0) return 'expired';
+  if (diff <= 30) return 'expiring';
+  return 'ok';
+}
+
+function statusBadge(s) {
+  var map = {
+    ok:      '<span class="badge badge-ok"><span class="dot"></span>Platné</span>',
+    expiring:'<span class="badge badge-warn"><span class="dot"></span>Brzy expiruje</span>',
+    expired: '<span class="badge badge-danger"><span class="dot"></span>Prošlé</span>',
+    missing: '<span class="badge badge-info"><span class="dot"></span>Chybí</span>'
+  };
+  return map[s] || '—';
+}
+
+function hexAlpha(hex, a) {
+  var r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return 'rgba('+r+','+g+','+b+','+a+')';
+}
+
+function typeTag(type) {
+  return '<span class="type-tag" style="background:'+hexAlpha(type.color,0.15)+';color:'+type.color+';">'+type.icon+' '+type.name+'</span>';
+}
+
+function normalizeTrainings() {
+  people.forEach(function(p) {
+    if (!p.trainings) p.trainings = {};
+    trainingTypes.forEach(function(t) {
+      if (!(t.id in p.trainings)) p.trainings[t.id] = null;
+    });
+  });
+}
+
+// ─── LOADING ─────────────────────────────────────────────
 function setLoading(on) {
-  let ov = document.getElementById('fb-loading');
+  var ov = document.getElementById('fb-loading');
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'fb-loading';
-    ov.innerHTML = `<div style="text-align:center;">
-      <div style="font-size:36px;margin-bottom:12px;">🔄</div>
-      <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;color:var(--primary);letter-spacing:1px;">Načítám data…</div>
-      <div style="font-size:13px;color:var(--text-muted);margin-top:6px;">Připojuji se k Firebase</div>
-    </div>`;
-    Object.assign(ov.style, {
-      position:'fixed', inset:'0', background:'rgba(237,244,248,0.92)',
-      display:'flex', alignItems:'center', justifyContent:'center',
-      zIndex:'9999', backdropFilter:'blur(4px)'
-    });
+    ov.innerHTML = '<div style="text-align:center;"><div style="font-size:36px;margin-bottom:12px;">🔄</div><div style="font-family:Barlow Condensed,sans-serif;font-size:18px;font-weight:700;color:#0073AB;letter-spacing:1px;">Načítám data…</div><div style="font-size:13px;color:#5E8098;margin-top:6px;">Připojuji se k Firebase</div></div>';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(237,244,248,0.95);display:flex;align-items:center;justify-content:center;z-index:9999;';
     document.body.appendChild(ov);
   }
   ov.style.display = on ? 'flex' : 'none';
 }
 
-// ─── DEFAULT TRAINING TYPES ───────────────────────────────────────────
-const DEFAULT_TYPES = [
-  { id:'bezpecnost', name:'Bezpečnost',    icon:'🦺',  color:'#DA3633', desc:'BOZP školení' },
-  { id:'vozik',      name:'Řízení vozíků', icon:'🏗️',  color:'#388BFD', desc:'Řidičské oprávnění VZV' },
-  { id:'instrukce',  name:'Instrukce',     icon:'📋',  color:'#2EA043', desc:'Pracovní instrukce' },
-];
-
-let trainingTypes = [];
-let nextTypeId = 100;
-
-// ─── PEOPLE (načítá se z Firebase) ───────────────────────────────────
-let people = [];
-let nextPersonId = Date.now(); // unique ID base
-
-// ─── FIREBASE: SAVE / LOAD ────────────────────────────────────────────
-async function fbSavePeople() {
-  const obj = {};
-  people.forEach(p => { obj[p.fbKey || p.id] = p; });
-  await db.ref('people').set(obj);
+function showNotif(msg, isError) {
+  var n = document.getElementById('notif');
+  n.textContent = msg;
+  n.style.background = isError ? '#C0392B' : '#1A7A3A';
+  n.classList.add('show');
+  setTimeout(function(){ n.classList.remove('show'); }, 3000);
 }
 
-async function fbSaveTypes() {
-  await db.ref('trainingTypes').set(trainingTypes);
-}
-
-async function fbDeletePerson(fbKey) {
-  await db.ref('people/' + fbKey).remove();
-}
-
-// Live sync — whenever DB changes, update UI
+// ─── FIREBASE LIVE SYNC ───────────────────────────────────
 function startLiveSync() {
-  db.ref('people').on('value', snap => {
-    const data = snap.val();
-    if (data) {
-      people = Object.entries(data).map(([key, p]) => ({ ...p, fbKey: key }));
+  setLoading(true);
+
+  db.ref('trainingTypes').on('value', function(snap) {
+    var data = snap.val();
+    if (data && Array.isArray(data) && data.length > 0) {
+      trainingTypes = data;
+    } else if (data && typeof data === 'object' && !Array.isArray(data)) {
+      trainingTypes = Object.values(data);
+    } else {
+      trainingTypes = DEFAULT_TYPES.slice();
+      db.ref('trainingTypes').set(trainingTypes);
+    }
+    buildSidebarTypes();
+    refreshCurrentPage();
+    setLoading(false);
+  });
+
+  db.ref('people').on('value', function(snap) {
+    var data = snap.val();
+    if (data && typeof data === 'object') {
+      people = Object.keys(data).map(function(key) {
+        var p = data[key];
+        p.fbKey = key;
+        if (!p.trainings) p.trainings = {};
+        return p;
+      });
     } else {
       people = [];
     }
     normalizeTrainings();
     refreshCurrentPage();
   });
-
-  db.ref('trainingTypes').on('value', snap => {
-    const data = snap.val();
-    if (data && Array.isArray(data) && data.length > 0) {
-      trainingTypes = data;
-    } else if (data && typeof data === 'object' && !Array.isArray(data)) {
-      trainingTypes = Object.values(data);
-    } else {
-      trainingTypes = DEFAULT_TYPES;
-      fbSaveTypes();
-    }
-    buildSidebarTypes();
-    refreshCurrentPage();
-  });
 }
 
-let _currentPage = 'dashboard';
 function refreshCurrentPage() {
   if (_currentPage === 'dashboard') renderDashboard();
   else if (_currentPage === 'people') renderPeople();
@@ -689,322 +741,286 @@ function refreshCurrentPage() {
   else if (_currentPage === 'types') renderTypesPage();
 }
 
-
-// ─── HELPERS ──────────────────────────────────────────────────────────
-const VALIDITY_YEARS = 1;
-const today = new Date(); today.setHours(0,0,0,0);
-
-function addYears(dateStr, y) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  d.setFullYear(d.getFullYear() + y);
-  return d;
-}
-function daysDiff(d) { return d ? Math.round((d - today) / 86400000) : null; }
-function fmtDate(s) { if (!s) return '—'; return new Date(s).toLocaleDateString('cs-CZ'); }
-function initials(n) { return n.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase(); }
-
-function getStatus(dateStr) {
-  if (!dateStr) return 'missing';
-  const exp = addYears(dateStr, VALIDITY_YEARS);
-  const diff = daysDiff(exp);
-  if (diff < 0) return 'expired';
-  if (diff <= 30) return 'expiring';
-  return 'ok';
-}
-
-function statusBadge(s) {
-  return {
-    ok:      '<span class="badge badge-ok"><span class="dot"></span>Platné</span>',
-    expiring:'<span class="badge badge-warn"><span class="dot"></span>Brzy expiruje</span>',
-    expired: '<span class="badge badge-danger"><span class="dot"></span>Prošlé</span>',
-    missing: '<span class="badge badge-info"><span class="dot"></span>Chybí</span>',
-  }[s] || '—';
-}
-
-function typeTag(type) {
-  return `<span class="type-tag" style="background:${hexAlpha(type.color,0.15)};color:${type.color};">${type.icon} ${type.name}</span>`;
-}
-function hexAlpha(hex, a) {
-  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
-  return `rgba(${r},${g},${b},${a})`;
-}
-
-// ─── ENSURE ALL PEOPLE HAVE ALL TRAINING KEYS ─────────────────────────
-function normalizeTrainings() {
-  people.forEach(p => {
-    trainingTypes.forEach(t => {
-      if (!(t.id in p.trainings)) p.trainings[t.id] = null;
-    });
-  });
-}
-
-// ─── NAVIGATION ───────────────────────────────────────────────────────
+// ─── NAVIGATION ──────────────────────────────────────────
 function showPage(id, el) {
   _currentPage = id;
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  const pg = document.getElementById('page-'+id);
-  if (pg) { pg.classList.add('active'); }
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.remove('active'); });
+  var pg = document.getElementById('page-'+id);
+  if (pg) pg.classList.add('active');
   if (el) el.classList.add('active');
-  if (id==='dashboard') renderDashboard();
-  else if (id==='people') renderPeople();
-  else if (id==='upcoming') renderUpcoming();
-  else if (id==='types') renderTypesPage();
+  refreshCurrentPage();
 }
 
 function showTypeDetail(typeId) {
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  const type = trainingTypes.find(t=>t.id===typeId);
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  var type = trainingTypes.find(function(t){ return t.id === typeId; });
   if (!type) return;
   document.getElementById('type-detail-title').textContent = type.icon + ' ' + type.name;
   document.getElementById('type-detail-sub').textContent = 'Opakování každý rok · ' + (type.desc||'');
-  const tbody = document.getElementById('type-detail-tbody');
-  const sorted = [...people].sort((a,b)=>{
-    const order = {expired:0,expiring:1,missing:2,ok:3};
+  var sorted = people.slice().sort(function(a,b){
+    var order = {expired:0,expiring:1,missing:2,ok:3};
     return (order[getStatus(a.trainings[typeId])]||0) - (order[getStatus(b.trainings[typeId])]||0);
   });
-  tbody.innerHTML = sorted.map(p => {
-    const s = getStatus(p.trainings[typeId]);
-    const exp = p.trainings[typeId] ? addYears(p.trainings[typeId], VALIDITY_YEARS) : null;
-    return `<tr>
-      <td><div class="person-cell"><div class="avatar">${initials(p.name)}</div><div><div class="person-name">${p.name}</div><div class="person-role">${p.role}</div></div></div></td>
-      <td>${p.trainings[typeId] ? fmtDate(p.trainings[typeId]) : '<span style="color:var(--text-muted)">—</span>'}</td>
-      <td>${exp ? exp.toLocaleDateString('cs-CZ') : '—'}</td>
-      <td>${statusBadge(s)}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="openEditTraining('${p.fbKey||p.id}','${typeId}')">📎 Aktualizovat</button></td>
-    </tr>`;
+  document.getElementById('type-detail-tbody').innerHTML = sorted.map(function(p) {
+    var s = getStatus(p.trainings[typeId]);
+    var exp = p.trainings[typeId] ? addYears(p.trainings[typeId], VALIDITY_YEARS) : null;
+    return '<tr><td><div class="person-cell"><div class="avatar">'+initials(p.name)+'</div><div><div class="person-name">'+p.name+'</div><div class="person-role">'+p.role+'</div></div></div></td>'
+      +'<td>'+(p.trainings[typeId]?fmtDate(p.trainings[typeId]):'<span style="color:var(--text-muted)">—</span>')+'</td>'
+      +'<td>'+(exp?exp.toLocaleDateString('cs-CZ'):'—')+'</td>'
+      +'<td>'+statusBadge(s)+'</td>'
+      +'<td><button class="btn btn-ghost btn-sm" onclick="openEditTraining(\''+p.fbKey+'\',\''+typeId+'\')">📎 Aktualizovat</button></td></tr>';
   }).join('');
   document.getElementById('page-type-detail').classList.add('active');
 }
 
-// ─── BUILD SIDEBAR TYPES ──────────────────────────────────────────────
 function buildSidebarTypes() {
-  const el = document.getElementById('type-nav-items');
-  el.innerHTML = trainingTypes.map(t => `
-    <div class="nav-item" onclick="showTypeDetail('${t.id}')">
-      <span class="icon">${t.icon}</span> ${t.name}
-    </div>`).join('');
+  document.getElementById('type-nav-items').innerHTML = trainingTypes.map(function(t) {
+    return '<div class="nav-item" onclick="showTypeDetail(\''+t.id+'\')"><span class="icon">'+t.icon+'</span> '+t.name+'</div>';
+  }).join('');
 }
 
-// ─── DASHBOARD ────────────────────────────────────────────────────────
+// ─── DASHBOARD ───────────────────────────────────────────
 function renderDashboard() {
   normalizeTrainings();
-  let okN=0, expN=0, overN=0;
-  const rows=[];
-
-  people.forEach(p => {
-    trainingTypes.forEach(type => {
-      const s = getStatus(p.trainings[type.id]);
+  var okN=0, expN=0, overN=0, rows=[];
+  people.forEach(function(p) {
+    trainingTypes.forEach(function(type) {
+      var s = getStatus(p.trainings[type.id]);
       if (s==='ok') okN++;
       else if (s==='expiring') expN++;
       else if (s==='expired') overN++;
       if (s!=='ok' && s!=='missing') {
-        const exp = addYears(p.trainings[type.id], VALIDITY_YEARS);
-        rows.push({ p, type, s, exp, diff: daysDiff(exp) });
+        var exp = addYears(p.trainings[type.id], VALIDITY_YEARS);
+        rows.push({p:p, type:type, s:s, exp:exp, diff:daysDiff(exp)});
       }
     });
   });
-
   document.getElementById('stat-ok').textContent = okN;
   document.getElementById('stat-exp').textContent = expN;
   document.getElementById('stat-over').textContent = overN;
   document.getElementById('stat-ppl').textContent = people.length;
 
-  rows.sort((a,b) => {
+  rows.sort(function(a,b){
     if (a.s==='expired'&&b.s!=='expired') return -1;
     if (b.s==='expired'&&a.s!=='expired') return 1;
     return (a.diff||999)-(b.diff||999);
   });
 
-  document.getElementById('dash-tbody').innerHTML = rows.slice(0,12).map(({p,type,s,exp,diff}) => `
-    <tr>
-      <td><div class="person-cell"><div class="avatar">${initials(p.name)}</div><div><div class="person-name">${p.name}</div><div class="person-role">${p.role}</div></div></div></td>
-      <td>${typeTag(type)}</td>
-      <td>${fmtDate(p.trainings[type.id])}</td>
-      <td>${exp ? exp.toLocaleDateString('cs-CZ') : '—'}</td>
-      <td>${statusBadge(s)}</td>
-    </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">✅ Vše v pořádku</td></tr>';
+  var html = rows.slice(0,12).map(function(r) {
+    return '<tr><td><div class="person-cell"><div class="avatar">'+initials(r.p.name)+'</div><div><div class="person-name">'+r.p.name+'</div><div class="person-role">'+r.p.role+'</div></div></div></td>'
+      +'<td>'+typeTag(r.type)+'</td>'
+      +'<td>'+fmtDate(r.p.trainings[r.type.id])+'</td>'
+      +'<td>'+(r.exp?r.exp.toLocaleDateString('cs-CZ'):'—')+'</td>'
+      +'<td>'+statusBadge(r.s)+'</td></tr>';
+  }).join('');
+  document.getElementById('dash-tbody').innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">✅ Vše v pořádku</td></tr>';
 
-  renderAlertBanner();
-  document.getElementById('nav-cnt').textContent = people.length;
-  const alertCount = expN + overN;
-  const nb = document.getElementById('nav-alert');
-  nb.textContent = alertCount;
-  nb.style.display = alertCount > 0 ? '' : 'none';
-}
-
-function renderAlertBanner() {
-  const items = [];
-  people.forEach(p => {
-    trainingTypes.forEach(type => {
-      const s = getStatus(p.trainings[type.id]);
-      if (s==='expired') items.push(`<div class="alert-chip">❌ ${p.name} – ${type.name}</div>`);
+  // Alert banner
+  var items = [];
+  people.forEach(function(p) {
+    trainingTypes.forEach(function(type) {
+      var s = getStatus(p.trainings[type.id]);
+      if (s==='expired') items.push('<div class="alert-chip">❌ '+p.name+' – '+type.name+'</div>');
       else if (s==='expiring') {
-        const diff = daysDiff(addYears(p.trainings[type.id], VALIDITY_YEARS));
-        items.push(`<div class="alert-chip soon">⏳ ${p.name} – ${type.name} (${diff}d)</div>`);
+        var diff = daysDiff(addYears(p.trainings[type.id], VALIDITY_YEARS));
+        items.push('<div class="alert-chip soon">⏳ '+p.name+' – '+type.name+' ('+diff+'d)</div>');
       }
     });
   });
   document.getElementById('alertItems').innerHTML = items.length ? items.join('') : '<span style="color:var(--text-muted);font-size:12px;">Žádná upozornění</span>';
+  document.getElementById('nav-cnt').textContent = people.length;
+  var nb = document.getElementById('nav-alert');
+  nb.textContent = expN+overN;
+  nb.style.display = (expN+overN) > 0 ? '' : 'none';
 }
 
-// ─── PEOPLE TABLE (dynamic columns) ───────────────────────────────────
-let _filterText='', _filterStatus='';
-
-function renderPeople(list) {
+// ─── PEOPLE TABLE ────────────────────────────────────────
+function renderPeople() {
   normalizeTrainings();
-  list = list || people;
-  if (_filterText) list = list.filter(p => p.name.toLowerCase().includes(_filterText)||p.role.toLowerCase().includes(_filterText));
-  if (_filterStatus) list = list.filter(p => trainingTypes.some(t => getStatus(p.trainings[t.id])===_filterStatus));
+  var list = people.slice();
+  if (_filterText) list = list.filter(function(p){ return p.name.toLowerCase().indexOf(_filterText)>-1 || p.role.toLowerCase().indexOf(_filterText)>-1; });
+  if (_filterStatus) list = list.filter(function(p){ return trainingTypes.some(function(t){ return getStatus(p.trainings[t.id])===_filterStatus; }); });
 
-  // Build header
-  document.getElementById('people-thead').innerHTML = '<tr>' +
-    '<th>Zaměstnanec</th>' +
-    trainingTypes.map(t=>`<th>${t.icon} ${t.name}</th>`).join('') +
-    '<th>Průběh</th><th>Akce</th></tr>';
+  var segMap = {ok:'done',expiring:'warn',expired:'overdue',missing:'miss'};
 
-  const segMap = s => ({ok:'done',expiring:'warn',expired:'overdue',missing:'miss'}[s]||'miss');
+  document.getElementById('people-thead').innerHTML = '<tr><th>Zaměstnanec</th>'
+    + trainingTypes.map(function(t){ return '<th>'+t.icon+' '+t.name+'</th>'; }).join('')
+    + '<th>Průběh</th><th>Akce</th></tr>';
 
-  document.getElementById('people-tbody').innerHTML = list.map(p => {
-    const cols = trainingTypes.map(t => {
-      const s = getStatus(p.trainings[t.id]);
-      return `<td>${statusBadge(s)}<div style="font-size:10px;color:var(--text-muted);margin-top:3px;">${p.trainings[t.id]?fmtDate(p.trainings[t.id]):'Chybí'}</div></td>`;
+  document.getElementById('people-tbody').innerHTML = list.map(function(p) {
+    var cols = trainingTypes.map(function(t) {
+      var s = getStatus(p.trainings[t.id]);
+      return '<td>'+statusBadge(s)+'<div style="font-size:10px;color:var(--text-muted);margin-top:3px;">'+(p.trainings[t.id]?fmtDate(p.trainings[t.id]):'Chybí')+'</div></td>';
     }).join('');
-    const segs = trainingTypes.map(t=>`<div class="prog-seg ${segMap(getStatus(p.trainings[t.id]))}" title="${t.name}"></div>`).join('');
-    return `<tr>
-      <td><div class="person-cell"><div class="avatar">${initials(p.name)}</div><div><div class="person-name">${p.name}</div><div class="person-role">${p.role} · ${p.dept}</div></div></div></td>
-      ${cols}
-      <td><div class="prog-wrap">${segs}</div></td>
-      <td style="white-space:nowrap;">
-        <button class="btn btn-ghost btn-sm" onclick="openEditPerson('${p.fbKey||p.id}')" title="Upravit osobu" style="margin-right:4px;">✏️ Upravit</button>
-        <button class="btn btn-ghost btn-sm" onclick="openEditTraining('${p.fbKey||p.id}')" title="Přidat školení">➕ Školení</button>
-      </td>
-    </tr>`;
+    var segs = trainingTypes.map(function(t){
+      var s = getStatus(p.trainings[t.id]);
+      return '<div class="prog-seg '+(segMap[s]||'miss')+'" title="'+t.name+'"></div>';
+    }).join('');
+    return '<tr><td><div class="person-cell"><div class="avatar">'+initials(p.name)+'</div>'
+      +'<div><div class="person-name">'+p.name+'</div><div class="person-role">'+p.role+' · '+p.dept+'</div></div></div></td>'
+      +cols
+      +'<td><div class="prog-wrap">'+segs+'</div></td>'
+      +'<td style="white-space:nowrap;">'
+      +'<button class="btn btn-ghost btn-sm" onclick="openEditPerson(\''+p.fbKey+'\')" style="margin-right:4px;">✏️ Upravit</button>'
+      +'<button class="btn btn-ghost btn-sm" onclick="openEditTraining(\''+p.fbKey+'\')">➕ Školení</button>'
+      +'</td></tr>';
   }).join('');
 }
 
-function filterPeople(v) { _filterText=v.toLowerCase(); renderPeople(); }
-function filterByStatus(v) { _filterStatus=v; renderPeople(); }
+function filterPeople(v) { _filterText = v.toLowerCase(); renderPeople(); }
+function filterByStatus(v) { _filterStatus = v; renderPeople(); }
 
-// ─── UPCOMING ─────────────────────────────────────────────────────────
+// ─── UPCOMING ────────────────────────────────────────────
 function renderUpcoming() {
   normalizeTrainings();
-  const expired=[], expiring=[];
-  people.forEach(p => {
-    trainingTypes.forEach(type => {
-      const s = getStatus(p.trainings[type.id]);
-      const exp = p.trainings[type.id] ? addYears(p.trainings[type.id], VALIDITY_YEARS) : null;
-      const diff = daysDiff(exp);
-      if (s==='expired') expired.push({p,type,diff,exp});
-      else if (s==='expiring') expiring.push({p,type,diff,exp});
+  var expired=[], expiring=[];
+  people.forEach(function(p) {
+    trainingTypes.forEach(function(type) {
+      var s = getStatus(p.trainings[type.id]);
+      var exp = p.trainings[type.id] ? addYears(p.trainings[type.id], VALIDITY_YEARS) : null;
+      var diff = daysDiff(exp);
+      if (s==='expired') expired.push({p:p,type:type,diff:diff,exp:exp});
+      else if (s==='expiring') expiring.push({p:p,type:type,diff:diff,exp:exp});
     });
   });
-  expired.sort((a,b)=>(a.diff||0)-(b.diff||0));
-  expiring.sort((a,b)=>(a.diff||999)-(b.diff||999));
+  expired.sort(function(a,b){return (a.diff||0)-(b.diff||0);});
+  expiring.sort(function(a,b){return (a.diff||999)-(b.diff||999);});
 
   function renderList(arr, id) {
-    const el = document.getElementById(id);
+    var el = document.getElementById(id);
     if (!arr.length) { el.innerHTML='<div style="padding:16px;color:var(--text-muted);font-size:13px;">Žádné záznamy</div>'; return; }
-    el.innerHTML = arr.map(({p,type,diff,exp}) => `
-      <div class="tl-item">
-        <div class="tl-dot" style="background:${diff<0?'#C0392B':'#E6A800'}"></div>
-        <div class="tl-content">
-          <div class="tl-name">${p.name}</div>
-          <div class="tl-date">${typeTag(type)} · ${exp?exp.toLocaleDateString('cs-CZ'):'—'}</div>
-        </div>
-        <div class="tl-days" style="color:${diff<0?'#C0392B':'#8A6200'}">
-          ${diff<0?Math.abs(diff)+'d po':'za '+diff+'d'}
-        </div>
-      </div>`).join('');
+    el.innerHTML = arr.map(function(r) {
+      return '<div class="tl-item">'
+        +'<div class="tl-dot" style="background:'+(r.diff<0?'#C0392B':'#E6A800')+'"></div>'
+        +'<div class="tl-content"><div class="tl-name">'+r.p.name+'</div>'
+        +'<div class="tl-date">'+typeTag(r.type)+' · '+(r.exp?r.exp.toLocaleDateString('cs-CZ'):'—')+'</div></div>'
+        +'<div class="tl-days" style="color:'+(r.diff<0?'#C0392B':'#8A6200')+'">'+(r.diff<0?Math.abs(r.diff)+'d po':'za '+r.diff+'d')+'</div>'
+        +'</div>';
+    }).join('');
   }
   renderList(expired,'expired-list');
   renderList(expiring,'expiring-list');
 }
 
-// ─── TYPES PAGE ───────────────────────────────────────────────────────
+// ─── TYPES PAGE ──────────────────────────────────────────
 function renderTypesPage() {
-  document.getElementById('type-cards-wrap').innerHTML = trainingTypes.map(t => `
-    <div class="type-card">
-      <div class="type-card-icon">${t.icon}</div>
-      <div class="type-card-info">
-        <div class="type-card-name">${t.name}</div>
-        <div class="type-card-validity">${t.desc||''} · Platnost 1 rok</div>
-      </div>
-      <div class="type-card-actions">
-        <button class="btn btn-ghost btn-xs" onclick="openEditType('${t.id}')">✏️</button>
-        ${trainingTypes.length>1?`<button class="btn btn-danger btn-xs" onclick="deleteType('${t.id}')">🗑</button>`:''}
-      </div>
-    </div>`).join('');
+  document.getElementById('type-cards-wrap').innerHTML = trainingTypes.map(function(t) {
+    var del = trainingTypes.length > 1 ? '<button class="btn btn-danger btn-xs" onclick="deleteType(\''+t.id+'\')">🗑</button>' : '';
+    return '<div class="type-card">'
+      +'<div class="type-card-icon">'+t.icon+'</div>'
+      +'<div class="type-card-info"><div class="type-card-name">'+t.name+'</div><div class="type-card-validity">'+(t.desc||'')+' · Platnost 1 rok</div></div>'
+      +'<div class="type-card-actions"><button class="btn btn-ghost btn-xs" onclick="openEditType(\''+t.id+'\')">✏️</button>'+del+'</div>'
+      +'</div>';
+  }).join('');
 }
 
-// ─── MODALS ───────────────────────────────────────────────────────────
+// ─── MODALS ──────────────────────────────────────────────
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
+// ADD PERSON
 function openAddPerson() {
-  normalizeTrainings();
-  ['p-name','p-role','p-dept','p-email','p-phone','p-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  document.getElementById('p-startdate').value = '';
+  ['p-name','p-role','p-dept','p-email','p-phone','p-note','p-startdate'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.value='';
+  });
   document.getElementById('person-files').innerHTML = '';
-  // Build training date fields
-  const fields = document.getElementById('person-training-fields');
-  fields.innerHTML = trainingTypes.map(t => `
-    <div class="form-group">
-      <label class="form-label">${t.icon} ${t.name}</label>
-      <input type="date" class="form-input" id="pf-${t.id}">
-    </div>`).join('');
+  document.getElementById('person-training-fields').innerHTML = trainingTypes.map(function(t) {
+    return '<div class="form-group"><label class="form-label">'+t.icon+' '+t.name+'</label><input type="date" class="form-input" id="pf-'+t.id+'"></div>';
+  }).join('');
   openModal('modal-person');
 }
 
-// ─── PERSON MODAL HELPERS ────────────────────────────────────────────
-function openAddPerson() {
-  normalizeTrainings();
-  ['p-name','p-role','p-dept','p-email','p-phone','p-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  document.getElementById('p-startdate').value = '';
-  document.getElementById('person-files').innerHTML = '';
-  const fields = document.getElementById('person-training-fields');
-  fields.innerHTML = trainingTypes.map(t => `
-    <div class="form-group">
-      <label class="form-label">${t.icon} ${t.name}</label>
-      <input type="date" class="form-input" id="pf-${t.id}">
-    </div>`).join('');
-  openModal('modal-person');
-}
-
-async function savePerson() {
-  const name = document.getElementById('p-name').value.trim();
-  const role = document.getElementById('p-role').value.trim();
+function savePerson() {
+  var name = document.getElementById('p-name').value.trim();
+  var role = document.getElementById('p-role').value.trim();
   if (!name||!role) { showNotif('Vyplňte jméno a pozici',true); return; }
-  const trainings = {};
-  trainingTypes.forEach(t => { trainings[t.id] = document.getElementById('pf-'+t.id)?.value || null; });
-  const newPerson = {
-    id: Date.now(), name, role,
+  var trainings = {};
+  trainingTypes.forEach(function(t) {
+    var el = document.getElementById('pf-'+t.id);
+    trainings[t.id] = el ? (el.value||null) : null;
+  });
+  var newPerson = {
+    id: Date.now(), name:name, role:role,
     dept: document.getElementById('p-dept').value.trim(),
     email: document.getElementById('p-email').value.trim(),
     phone: document.getElementById('p-phone').value.trim(),
     startDate: document.getElementById('p-startdate').value,
-    trainings, files:[], note: document.getElementById('p-note').value.trim()
+    note: document.getElementById('p-note').value.trim(),
+    trainings: trainings, files: []
   };
-  try {
-    const newRef = db.ref('people').push();
-    newPerson.fbKey = newRef.key;
-    await newRef.set(newPerson);
+  var newRef = db.ref('people').push();
+  newPerson.fbKey = newRef.key;
+  newRef.set(newPerson).then(function() {
     closeModal('modal-person');
-    showNotif('✅ Osoba přidána — ' + name);
-  } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
+    showNotif('✅ Osoba přidána — '+name);
+  }).catch(function(e){ showNotif('❌ Chyba: '+e.message,true); });
 }
 
-// ─── TRAINING MODAL ───────────────────────────────────────────────────
+// EDIT PERSON
+function openEditPerson(fbKey) {
+  var p = people.find(function(x){ return x.fbKey===fbKey; });
+  if (!p) return;
+  normalizeTrainings();
+  document.getElementById('ep-id').value = fbKey;
+  document.getElementById('ep-name').value = p.name||'';
+  document.getElementById('ep-role').value = p.role||'';
+  document.getElementById('ep-dept').value = p.dept||'';
+  document.getElementById('ep-email').value = p.email||'';
+  document.getElementById('ep-phone').value = p.phone||'';
+  document.getElementById('ep-startdate').value = p.startDate||'';
+  document.getElementById('ep-note').value = p.note||'';
+  document.getElementById('ep-files').innerHTML = '';
+  document.getElementById('edit-person-title').textContent = '✏️ Upravit — '+p.name;
+  document.getElementById('edit-person-training-fields').innerHTML = trainingTypes.map(function(t) {
+    return '<div class="form-group"><label class="form-label">'+t.icon+' '+t.name+'</label><input type="date" class="form-input" id="epf-'+t.id+'" value="'+(p.trainings[t.id]||'')+'"></div>';
+  }).join('');
+  openModal('modal-edit-person');
+}
+
+function updatePerson() {
+  var fbKey = document.getElementById('ep-id').value;
+  var name  = document.getElementById('ep-name').value.trim();
+  var role  = document.getElementById('ep-role').value.trim();
+  if (!name||!role) { showNotif('Vyplňte jméno a pozici',true); return; }
+  var p = people.find(function(x){ return x.fbKey===fbKey; });
+  if (!p) return;
+  p.name=name; p.role=role;
+  p.dept  = document.getElementById('ep-dept').value.trim();
+  p.email = document.getElementById('ep-email').value.trim();
+  p.phone = document.getElementById('ep-phone').value.trim();
+  p.startDate = document.getElementById('ep-startdate').value;
+  p.note  = document.getElementById('ep-note').value.trim();
+  trainingTypes.forEach(function(t){
+    var el = document.getElementById('epf-'+t.id);
+    p.trainings[t.id] = el ? (el.value||null) : null;
+  });
+  db.ref('people/'+fbKey).set(p).then(function(){
+    closeModal('modal-edit-person');
+    showNotif('✅ Změny uloženy — '+name);
+  }).catch(function(e){ showNotif('❌ Chyba: '+e.message,true); });
+}
+
+function deletePerson() {
+  var fbKey = document.getElementById('ep-id').value;
+  var p = people.find(function(x){ return x.fbKey===fbKey; });
+  if (!p) return;
+  if (!confirm('Opravdu smazat osobu "'+p.name+'"? Tato akce je nevratná.')) return;
+  db.ref('people/'+fbKey).remove().then(function(){
+    closeModal('modal-edit-person');
+    showNotif('🗑 Osoba odstraněna');
+  }).catch(function(e){ showNotif('❌ Chyba: '+e.message,true); });
+}
+
+// ADD TRAINING
 function openAddTraining() {
-  const sel = document.getElementById('t-person');
-  sel.innerHTML = '<option value="">— vyberte osobu —</option>' +
-    people.map(p=>`<option value="${p.fbKey||p.id}">${p.name}</option>`).join('');
-  const tsel = document.getElementById('t-type');
-  tsel.innerHTML = trainingTypes.map(t=>`<option value="${t.id}">${t.icon} ${t.name}</option>`).join('');
+  document.getElementById('t-person').innerHTML = '<option value="">— vyberte osobu —</option>'
+    + people.map(function(p){ return '<option value="'+p.fbKey+'">'+p.name+'</option>'; }).join('');
+  document.getElementById('t-type').innerHTML = trainingTypes.map(function(t){
+    return '<option value="'+t.id+'">'+t.icon+' '+t.name+'</option>';
+  }).join('');
   document.getElementById('training-files').innerHTML='';
-  ['t-date','t-instructor','t-cert','t-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['t-date','t-instructor','t-cert','t-note'].forEach(function(id){ var el=document.getElementById(id); if(el)el.value=''; });
   openModal('modal-training');
 }
 
@@ -1014,97 +1030,36 @@ function openEditTraining(fbKey, preselect) {
   if (preselect) document.getElementById('t-type').value = preselect;
 }
 
-async function saveTraining() {
-  const fbKey = document.getElementById('t-person').value;
-  const type  = document.getElementById('t-type').value;
-  const date  = document.getElementById('t-date').value;
+function saveTraining() {
+  var fbKey = document.getElementById('t-person').value;
+  var type  = document.getElementById('t-type').value;
+  var date  = document.getElementById('t-date').value;
   if (!fbKey||!date) { showNotif('Vyplňte osobu a datum',true); return; }
-  const person = people.find(p=>(p.fbKey||p.id)==fbKey);
+  var person = people.find(function(p){ return p.fbKey===fbKey; });
   if (!person) return;
+  if (!person.trainings) person.trainings = {};
   person.trainings[type] = date;
-  try {
-    await db.ref('people/' + (person.fbKey||person.id)).set(person);
+  db.ref('people/'+fbKey).set(person).then(function(){
     closeModal('modal-training');
     showNotif('✅ Školení uloženo');
-  } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
+  }).catch(function(e){ showNotif('❌ Chyba: '+e.message,true); });
 }
 
-// ─── EDIT / DELETE PERSON ────────────────────────────────────────────
-function openEditPerson(fbKey) {
-  normalizeTrainings();
-  const p = people.find(x => (x.fbKey||x.id) == fbKey);
-  if (!p) return;
-  document.getElementById('ep-id').value = p.fbKey || p.id;
-  document.getElementById('ep-name').value = p.name;
-  document.getElementById('ep-role').value = p.role;
-  document.getElementById('ep-dept').value = p.dept || '';
-  document.getElementById('ep-email').value = p.email || '';
-  document.getElementById('ep-phone').value = p.phone || '';
-  document.getElementById('ep-startdate').value = p.startDate || '';
-  document.getElementById('ep-note').value = p.note || '';
-  document.getElementById('ep-files').innerHTML = '';
-  document.getElementById('edit-person-title').textContent = '✏️ Upravit — ' + p.name;
-  const fields = document.getElementById('edit-person-training-fields');
-  fields.innerHTML = trainingTypes.map(t => `
-    <div class="form-group">
-      <label class="form-label">${t.icon} ${t.name}</label>
-      <input type="date" class="form-input" id="epf-${t.id}" value="${p.trainings[t.id] || ''}">
-    </div>`).join('');
-  openModal('modal-edit-person');
-}
-
-async function updatePerson() {
-  const fbKey = document.getElementById('ep-id').value;
-  const name  = document.getElementById('ep-name').value.trim();
-  const role  = document.getElementById('ep-role').value.trim();
-  if (!name||!role) { showNotif('Vyplňte jméno a pozici',true); return; }
-  const p = people.find(x=>(x.fbKey||x.id)==fbKey);
-  if (!p) return;
-  p.name = name; p.role = role;
-  p.dept  = document.getElementById('ep-dept').value.trim();
-  p.email = document.getElementById('ep-email').value.trim();
-  p.phone = document.getElementById('ep-phone').value.trim();
-  p.startDate = document.getElementById('ep-startdate').value;
-  p.note  = document.getElementById('ep-note').value.trim();
-  trainingTypes.forEach(t => { p.trainings[t.id] = document.getElementById('epf-'+t.id)?.value || null; });
-  try {
-    await db.ref('people/' + fbKey).set(p);
-    closeModal('modal-edit-person');
-    showNotif('✅ Změny uloženy — ' + name);
-  } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
-}
-
-async function deletePerson() {
-  const fbKey = document.getElementById('ep-id').value;
-  const p = people.find(x=>(x.fbKey||x.id)==fbKey);
-  if (!p) return;
-  if (!confirm(`Opravdu smazat osobu "${p.name}"? Tato akce je nevratná.`)) return;
-  try {
-    await db.ref('people/' + fbKey).remove();
-    closeModal('modal-edit-person');
-    showNotif('🗑 Osoba odstraněna');
-  } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
-}
-
-// ─── TYPE MANAGEMENT ─────────────────────────────────────────────────
-const ICONS = ['🦺','🏗️','📋','🔥','⚡','🚗','🏥','🔒','📐','🧯','🛡️','📝','🔧','🚧','🌡️','💊','🧪','📡'];
-const COLORS = ['#DA3633','#388BFD','#2EA043','#D29922','#E8500A','#8957E5','#F78166','#39D353','#58A6FF','#DB61A2'];
-let editingTypeId = null;
-
+// TRAINING TYPES
 function openAddType() {
   editingTypeId = null;
   document.getElementById('type-modal-title').textContent = 'Nový typ školení';
-  document.getElementById('ty-name').value = '';
-  document.getElementById('ty-desc').value = '';
-  document.getElementById('ty-icon').value = '📝';
-  document.getElementById('ty-color').value = '#E8500A';
+  document.getElementById('ty-name').value='';
+  document.getElementById('ty-desc').value='';
+  document.getElementById('ty-icon').value='📝';
+  document.getElementById('ty-color').value='#0073AB';
   buildIconRow(); buildColorRow();
   openModal('modal-type');
 }
 
 function openEditType(typeId) {
   editingTypeId = typeId;
-  const t = trainingTypes.find(x=>x.id===typeId);
+  var t = trainingTypes.find(function(x){ return x.id===typeId; });
   if (!t) return;
   document.getElementById('type-modal-title').textContent = 'Upravit typ školení';
   document.getElementById('ty-name').value = t.name;
@@ -1116,117 +1071,83 @@ function openEditType(typeId) {
 }
 
 function buildIconRow() {
-  const sel = document.getElementById('ty-icon').value;
-  document.getElementById('icon-row').innerHTML = ICONS.map(ic =>
-    `<div class="icon-opt ${ic===sel?'selected':''}" onclick="selectIcon('${ic}',this)">${ic}</div>`).join('');
+  var sel = document.getElementById('ty-icon').value;
+  document.getElementById('icon-row').innerHTML = ICONS.map(function(ic){
+    return '<div class="icon-opt '+(ic===sel?'selected':'')+'" onclick="selectIcon(\''+ic+'\',this)">'+ic+'</div>';
+  }).join('');
 }
+
 function buildColorRow() {
-  const sel = document.getElementById('ty-color').value;
-  document.getElementById('color-row').innerHTML = COLORS.map(c =>
-    `<div class="color-dot ${c===sel?'selected':''}" style="background:${c}" onclick="selectColor('${c}',this)" title="${c}"></div>`).join('');
+  var sel = document.getElementById('ty-color').value;
+  document.getElementById('color-row').innerHTML = COLORS.map(function(c){
+    return '<div class="color-dot '+(c===sel?'selected':'')+'" style="background:'+c+'" onclick="selectColor(\''+c+'\',this)"></div>';
+  }).join('');
 }
+
 function selectIcon(ic, el) {
   document.getElementById('ty-icon').value = ic;
-  document.querySelectorAll('.icon-opt').forEach(e=>e.classList.remove('selected'));
-  el.classList.add('selected');
-}
-function selectColor(c, el) {
-  document.getElementById('ty-color').value = c;
-  document.querySelectorAll('.color-dot').forEach(e=>e.classList.remove('selected'));
+  document.querySelectorAll('.icon-opt').forEach(function(e){ e.classList.remove('selected'); });
   el.classList.add('selected');
 }
 
-async function saveType() {
-  const name = document.getElementById('ty-name').value.trim();
+function selectColor(c, el) {
+  document.getElementById('ty-color').value = c;
+  document.querySelectorAll('.color-dot').forEach(function(e){ e.classList.remove('selected'); });
+  el.classList.add('selected');
+}
+
+function saveType() {
+  var name = document.getElementById('ty-name').value.trim();
   if (!name) { showNotif('Zadejte název školení',true); return; }
-  const icon  = document.getElementById('ty-icon').value || '📝';
-  const color = document.getElementById('ty-color').value || '#0073AB';
-  const desc  = document.getElementById('ty-desc').value.trim();
+  var icon  = document.getElementById('ty-icon').value || '📝';
+  var color = document.getElementById('ty-color').value || '#0073AB';
+  var desc  = document.getElementById('ty-desc').value.trim();
   if (editingTypeId) {
-    const t = trainingTypes.find(x=>x.id===editingTypeId);
+    var t = trainingTypes.find(function(x){ return x.id===editingTypeId; });
     if (t) { t.name=name; t.icon=icon; t.color=color; t.desc=desc; }
     showNotif('✅ Typ upraven');
   } else {
-    const id = 'type_' + Date.now();
-    trainingTypes.push({ id, name, icon, color, desc });
-    showNotif('✅ Nový typ přidán: ' + name);
+    trainingTypes.push({ id:'type_'+Date.now(), name:name, icon:icon, color:color, desc:desc });
+    showNotif('✅ Nový typ přidán: '+name);
   }
-  try {
-    await db.ref('trainingTypes').set(trainingTypes);
+  db.ref('trainingTypes').set(trainingTypes).then(function(){
     closeModal('modal-type');
-  } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
+  }).catch(function(e){ showNotif('❌ Chyba: '+e.message,true); });
 }
 
-async function deleteType(typeId) {
+function deleteType(typeId) {
   if (trainingTypes.length <= 1) { showNotif('Musí zůstat alespoň jeden typ',true); return; }
-  const t = trainingTypes.find(x=>x.id===typeId);
-  if (!confirm(`Opravdu smazat typ "${t?.name}"?`)) return;
-  trainingTypes = trainingTypes.filter(x=>x.id!==typeId);
-  try {
-    await db.ref('trainingTypes').set(trainingTypes);
+  var t = trainingTypes.find(function(x){ return x.id===typeId; });
+  if (!confirm('Opravdu smazat typ "'+t.name+'"?')) return;
+  trainingTypes = trainingTypes.filter(function(x){ return x.id!==typeId; });
+  db.ref('trainingTypes').set(trainingTypes).then(function(){
     showNotif('🗑 Typ odstraněn');
-  } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
+  }).catch(function(e){ showNotif('❌ Chyba: '+e.message,true); });
 }
 
-// ─── FILE UPLOAD ──────────────────────────────────────────────────────
+// FILE UPLOAD
 function handleFileUpload(event, listId) {
-  Array.from(event.target.files).forEach(f => {
-    const item = document.createElement('div');
+  Array.from(event.target.files).forEach(function(f) {
+    var item = document.createElement('div');
     item.className = 'file-item';
-    item.innerHTML = `<span>📄</span><span class="file-name">${f.name}</span><span class="file-size">${(f.size/1024).toFixed(0)} KB</span><button class="file-remove" onclick="this.parentElement.remove()">✕</button>`;
+    item.innerHTML = '<span>📄</span><span class="file-name">'+f.name+'</span><span class="file-size">'+(f.size/1024).toFixed(0)+' KB</span><button class="file-remove" onclick="this.parentElement.remove()">✕</button>';
     document.getElementById(listId).appendChild(item);
   });
 }
 
-// ─── NOTIFICATION ─────────────────────────────────────────────────────
-function showNotif(msg, isError) {
-  const n = document.getElementById('notif');
-  n.textContent = msg;
-  n.style.background = isError ? 'var(--red)' : 'var(--green)';
-  n.classList.add('show');
-  setTimeout(()=>n.classList.remove('show'), 3000);
-}
-
-// ─── MODAL CLOSE ON BG + ESC ──────────────────────────────────────────
-document.querySelectorAll('.modal-bg').forEach(bg => {
-  bg.addEventListener('click', e => { if(e.target===bg) bg.classList.remove('open'); });
+// MODAL CLOSE
+document.querySelectorAll('.modal-bg').forEach(function(bg){
+  bg.addEventListener('click', function(e){ if(e.target===bg) bg.classList.remove('open'); });
 });
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') document.querySelectorAll('.modal-bg.open').forEach(bg => bg.classList.remove('open'));
+document.addEventListener('keydown', function(e){
+  if (e.key==='Escape') document.querySelectorAll('.modal-bg.open').forEach(function(bg){ bg.classList.remove('open'); });
 });
 
-// ─── INIT ─────────────────────────────────────────────────────────────
+// ─── INIT ────────────────────────────────────────────────
 document.getElementById('todayDate').textContent =
   today.toLocaleDateString('cs-CZ',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 
-// Zpřístupni všechny funkce globálně pro onclick atributy
-window.showPage         = showPage;
-window.showTypeDetail   = showTypeDetail;
-window.openAddPerson    = openAddPerson;
-window.openEditPerson   = openEditPerson;
-window.openAddTraining  = openAddTraining;
-window.openEditTraining = openEditTraining;
-window.openAddType      = openAddType;
-window.openEditType     = openEditType;
-window.deleteType       = deleteType;
-window.deletePerson     = deletePerson;
-window.savePerson       = savePerson;
-window.saveTraining     = saveTraining;
-window.updatePerson     = updatePerson;
-window.saveType         = saveType;
-window.openModal        = openModal;
-window.closeModal       = closeModal;
-window.selectIcon       = selectIcon;
-window.selectColor      = selectColor;
-window.handleFileUpload = handleFileUpload;
-window.filterPeople     = filterPeople;
-window.filterByStatus   = filterByStatus;
-
-setLoading(true);
 startLiveSync();
-setTimeout(() => setLoading(false), 2500);
-
-}); // end window.addEventListener('load')
 </script>
 </body>
 </html>
