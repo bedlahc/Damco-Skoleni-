@@ -260,7 +260,30 @@
     .form-grid { grid-template-columns: 1fr; }
   }
 
-  /* ── TISK KARTY ZAMĚSTNANCE ── */
+  /* ── DOKUMENTY ── */
+  .doc-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--card-radius);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: box-shadow 0.15s, border-color 0.15s;
+    cursor: pointer;
+  }
+  .doc-card:hover { box-shadow: 0 4px 16px rgba(0,80,130,0.13); border-color: var(--primary); }
+  .doc-card-icon { font-size: 32px; margin-bottom: 2px; }
+  .doc-card-name { font-weight: 700; color: var(--text); font-size: 14px; line-height: 1.3; }
+  .doc-card-meta { font-size: 11px; color: var(--text-muted); display: flex; flex-direction: column; gap: 3px; }
+  .doc-card-cat {
+    display: inline-block; padding: 2px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 700;
+    background: var(--primary-light); color: var(--primary); border: 1px solid var(--border);
+  }
+  .doc-card-actions { display: flex; gap: 8px; margin-top: auto; }
+
+  /* ── TISK ── */
   @media print {
     body * { visibility: hidden !important; }
     #print-card, #print-card * { visibility: visible !important; }
@@ -414,6 +437,7 @@
   <hr class="nav-divider">
   <div class="sidebar-section-label">Akce</div>
   <div class="nav-item" onclick="openAddTraining()"><span class="icon">➕</span> Přidat školení</div>
+  <div class="nav-item" onclick="showPage('docs',this)"><span class="icon">📁</span> Dokumenty</div>
   <div class="nav-item" onclick="showPage('types',null)"><span class="icon">⚙️</span> Spravovat typy</div>
 </sidebar>
 
@@ -493,6 +517,38 @@
     <div class="type-cards" id="type-cards-wrap"></div>
     <div style="background:var(--primary-light);border:1px solid var(--border);border-left:4px solid var(--primary);border-radius:var(--card-radius);padding:16px 20px;font-size:13px;color:var(--text-muted);">
       💡 <strong style="color:var(--primary);">Jak to funguje:</strong> Každý typ školení má platnost <strong style="color:var(--primary);">1 rok</strong>. Po přidání nového typu se automaticky zobrazí ve všech přehledech a u každé osoby.
+    </div>
+  </div>
+
+  <!-- DOKUMENTY -->
+  <div class="page" id="page-docs">
+    <div class="page-header">
+      <div>
+        <div class="page-title">📁 Dokumenty</div>
+        <div class="page-subtitle">Skeny školení, instrukce, procedury a bezpečnostní dokumenty</div>
+      </div>
+      <button class="btn btn-primary" onclick="openUploadDoc()">+ Nahrát dokument</button>
+    </div>
+
+    <!-- Filtry kategorií -->
+    <div class="filter-bar">
+      <input type="text" class="search-input" placeholder="Hledat název dokumentu…" oninput="filterDocs(this.value)">
+      <select class="filter-select" id="doc-cat-filter" onchange="filterDocsByCat(this.value)">
+        <option value="">Všechny kategorie</option>
+        <option value="skoleni">🎓 Školení</option>
+        <option value="instrukce">📋 Instrukce</option>
+        <option value="procedury">⚙️ Procedury</option>
+        <option value="bezpecnost">🦺 Bezpečnost</option>
+        <option value="ostatni">📄 Ostatní</option>
+      </select>
+    </div>
+
+    <!-- Dokumenty grid -->
+    <div id="docs-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;"></div>
+    <div id="docs-empty" style="display:none;text-align:center;padding:48px;color:var(--text-muted);">
+      <div style="font-size:48px;margin-bottom:12px;">📂</div>
+      <div style="font-size:16px;font-weight:600;">Žádné dokumenty</div>
+      <div style="font-size:13px;margin-top:4px;">Nahrajte první dokument tlačítkem výše</div>
     </div>
   </div>
 
@@ -742,6 +798,80 @@
   </div>
 </div>
 
+<!-- ============= MODAL: UPLOAD DOCUMENT ============= -->
+<div class="modal-bg" id="modal-upload-doc">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title">📁 Nahrát dokument</div>
+      <button class="modal-close" onclick="closeModal('modal-upload-doc')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Název dokumentu *</label>
+          <input type="text" class="form-input" id="doc-name" placeholder="např. Školení BOZP 2025, Pracovní instrukce č.3…">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Kategorie *</label>
+          <select class="form-input" id="doc-cat">
+            <option value="skoleni">🎓 Školení</option>
+            <option value="instrukce">📋 Instrukce</option>
+            <option value="procedury">⚙️ Procedury</option>
+            <option value="bezpecnost">🦺 Bezpečnost</option>
+            <option value="ostatni">📄 Ostatní</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Přiřadit zaměstnanci</label>
+          <select class="form-input" id="doc-person">
+            <option value="">— Obecný dokument —</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Popis</label>
+          <textarea class="form-input" id="doc-desc" rows="2" placeholder="Krátký popis dokumentu…" style="resize:vertical;"></textarea>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Soubor * (PDF, JPG, PNG, DOC — max. 20 MB)</label>
+          <div class="upload-zone" id="doc-upload-zone" onclick="document.getElementById('doc-file-input').click()"
+            style="cursor:pointer;">
+            <input type="file" id="doc-file-input" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+              style="display:none;" onchange="onDocFileSelected(event)">
+            <div class="upload-icon">📎</div>
+            <div class="upload-text" id="doc-upload-text">Klikněte pro výběr souboru nebo přetáhněte sem</div>
+            <div class="upload-meta">PDF, JPG, PNG, DOC, DOCX — max. 20 MB</div>
+          </div>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="form-group full" id="doc-progress-wrap" style="display:none;">
+          <label class="form-label">Nahrávání…</label>
+          <div style="background:var(--border);border-radius:6px;height:10px;overflow:hidden;">
+            <div id="doc-progress-bar" style="height:100%;background:var(--primary);width:0%;transition:width 0.3s;border-radius:6px;"></div>
+          </div>
+          <div id="doc-progress-text" style="font-size:12px;color:var(--text-muted);margin-top:4px;">0%</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+        <button class="btn btn-ghost" onclick="closeModal('modal-upload-doc')">Zrušit</button>
+        <button class="btn btn-primary" id="doc-upload-btn" onclick="uploadDocument()">📤 Nahrát</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============= MODAL: DOCUMENT DETAIL ============= -->
+<div class="modal-bg" id="modal-doc-detail">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <div class="modal-title" id="doc-detail-title">Dokument</div>
+      <button class="modal-close" onclick="closeModal('modal-doc-detail')">✕</button>
+    </div>
+    <div class="modal-body" id="doc-detail-body"></div>
+  </div>
+</div>
+
 <!-- TISKOVÁ KARTA -->
 <div id="print-card"></div>
 
@@ -765,8 +895,9 @@ function loadScript(src, cb) {
 
 loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js', function() {
   loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js', function() {
-    // Firebase je načten — teď inicializujeme
-    initApp();
+    loadScript('https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js', function() {
+      initApp();
+    });
   });
 });
 
@@ -783,7 +914,8 @@ var firebaseConfig = {
 };
 
 firebase.initializeApp(firebaseConfig);
-var db = firebase.database();
+var db      = firebase.database();
+var storage = firebase.storage();
 
 // ─── DATA ────────────────────────────────────────────────
 var trainingTypes = [];
@@ -915,6 +1047,7 @@ function refreshCurrentPage() {
   else if (_currentPage === 'people') renderPeople();
   else if (_currentPage === 'upcoming') renderUpcoming();
   else if (_currentPage === 'types') renderTypesPage();
+  else if (_currentPage === 'docs') renderDocs();
 }
 
 // ─── NAVIGATION ──────────────────────────────────────────
@@ -1446,6 +1579,218 @@ document.addEventListener('keydown', function(e){
   if (e.key==='Escape') document.querySelectorAll('.modal-bg.open').forEach(function(bg){ bg.classList.remove('open'); });
 });
 
+// ─── DOKUMENTY ───────────────────────────────────────────
+var _allDocs = [];
+var _docFilterText = '';
+var _docFilterCat  = '';
+var _selectedDocFile = null;
+
+var DOC_CATS = {
+  skoleni:    { label:'Školení',    icon:'🎓' },
+  instrukce:  { label:'Instrukce',  icon:'📋' },
+  procedury:  { label:'Procedury',  icon:'⚙️' },
+  bezpecnost: { label:'Bezpečnost', icon:'🦺' },
+  ostatni:    { label:'Ostatní',    icon:'📄' }
+};
+
+function fileIcon(name) {
+  var ext = (name||'').split('.').pop().toLowerCase();
+  if (ext==='pdf') return '📕';
+  if (['jpg','jpeg','png','gif','webp'].indexOf(ext)>-1) return '🖼️';
+  if (['doc','docx'].indexOf(ext)>-1) return '📘';
+  return '📄';
+}
+
+function startDocsSync() {
+  db.ref('documents').on('value', function(snap) {
+    var data = snap.val();
+    _allDocs = data ? Object.keys(data).map(function(k){ var d=data[k]; d.fbKey=k; return d; }) : [];
+    _allDocs.sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
+    if (_currentPage === 'docs') renderDocs();
+  });
+}
+
+function renderDocs() {
+  var list = _allDocs.slice();
+  if (_docFilterText) list = list.filter(function(d){
+    return (d.name||'').toLowerCase().indexOf(_docFilterText)>-1
+        || (d.desc||'').toLowerCase().indexOf(_docFilterText)>-1;
+  });
+  if (_docFilterCat) list = list.filter(function(d){ return d.cat === _docFilterCat; });
+
+  var grid = document.getElementById('docs-grid');
+  var empty = document.getElementById('docs-empty');
+
+  if (!list.length) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  grid.innerHTML = list.map(function(d) {
+    var cat = DOC_CATS[d.cat] || DOC_CATS.ostatni;
+    var personName = '';
+    if (d.personFbKey) {
+      var p = people.find(function(x){ return x.fbKey===d.personFbKey; });
+      if (p) personName = '👤 '+p.name;
+    }
+    var date = d.createdAt ? new Date(d.createdAt).toLocaleDateString('cs-CZ') : '';
+    return '<div class="doc-card" onclick="openDocDetail(\''+d.fbKey+'\')">'
+      +'<div class="doc-card-icon">'+fileIcon(d.fileName)+'</div>'
+      +'<div class="doc-card-name">'+d.name+'</div>'
+      +'<div>'
+        +'<span class="doc-card-cat">'+cat.icon+' '+cat.label+'</span>'
+      +'</div>'
+      +'<div class="doc-card-meta">'
+        +(personName ? '<span>'+personName+'</span>' : '')
+        +(d.desc ? '<span>'+d.desc+'</span>' : '')
+        +'<span>📅 '+date+'</span>'
+        +'<span style="color:var(--text-muted);font-size:10px;">'+d.fileName+'</span>'
+      +'</div>'
+      +'<div class="doc-card-actions" onclick="event.stopPropagation()">'
+        +'<button class="btn btn-primary btn-sm" onclick="openDocUrl(\''+d.fbKey+'\')">👁 Otevřít</button>'
+        +'<button class="btn btn-ghost btn-sm" onclick="deleteDoc(\''+d.fbKey+'\')">🗑</button>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function filterDocs(v) { _docFilterText = v.toLowerCase(); renderDocs(); }
+function filterDocsByCat(v) { _docFilterCat = v; renderDocs(); }
+
+function openUploadDoc() {
+  _selectedDocFile = null;
+  document.getElementById('doc-name').value = '';
+  document.getElementById('doc-desc').value = '';
+  document.getElementById('doc-cat').value = 'skoleni';
+  document.getElementById('doc-upload-text').textContent = 'Klikněte pro výběr souboru nebo přetáhněte sem';
+  document.getElementById('doc-progress-wrap').style.display = 'none';
+  document.getElementById('doc-progress-bar').style.width = '0%';
+  document.getElementById('doc-upload-btn').disabled = false;
+  document.getElementById('doc-person').innerHTML =
+    '<option value="">— Obecný dokument —</option>'
+    + people.map(function(p){ return '<option value="'+p.fbKey+'">'+p.name+'</option>'; }).join('');
+  openModal('modal-upload-doc');
+}
+
+function onDocFileSelected(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 20*1024*1024) { showNotif('Soubor je příliš velký (max 20 MB)',true); return; }
+  _selectedDocFile = file;
+  document.getElementById('doc-upload-text').textContent = '✅ '+file.name+' ('+Math.round(file.size/1024)+' KB)';
+  // Auto-fill name if empty
+  if (!document.getElementById('doc-name').value) {
+    document.getElementById('doc-name').value = file.name.replace(/\.[^.]+$/,'');
+  }
+}
+
+// Drag & drop support
+document.addEventListener('DOMContentLoaded', function() {
+  var zone = document.getElementById('doc-upload-zone');
+  if (!zone) return;
+  zone.addEventListener('dragover', function(e){ e.preventDefault(); zone.style.borderColor='var(--primary)'; });
+  zone.addEventListener('dragleave', function(){ zone.style.borderColor=''; });
+  zone.addEventListener('drop', function(e){
+    e.preventDefault(); zone.style.borderColor='';
+    var file = e.dataTransfer.files[0];
+    if (file) {
+      document.getElementById('doc-file-input').files = e.dataTransfer.files;
+      onDocFileSelected({target:{files:e.dataTransfer.files}});
+    }
+  });
+});
+
+function uploadDocument() {
+  var name = document.getElementById('doc-name').value.trim();
+  if (!name) { showNotif('Vyplňte název dokumentu',true); return; }
+  if (!_selectedDocFile) { showNotif('Vyberte soubor',true); return; }
+
+  var cat       = document.getElementById('doc-cat').value;
+  var personKey = document.getElementById('doc-person').value;
+  var desc      = document.getElementById('doc-desc').value.trim();
+  var file      = _selectedDocFile;
+  var path      = 'documents/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+
+  document.getElementById('doc-upload-btn').disabled = true;
+  document.getElementById('doc-progress-wrap').style.display = 'block';
+
+  var uploadTask = storage.ref(path).put(file);
+  uploadTask.on('state_changed',
+    function(snapshot) {
+      var pct = Math.round(snapshot.bytesTransferred / snapshot.totalBytes * 100);
+      document.getElementById('doc-progress-bar').style.width = pct+'%';
+      document.getElementById('doc-progress-text').textContent = pct+'%';
+    },
+    function(err) { showNotif('❌ Chyba nahrávání: '+err.message,true); document.getElementById('doc-upload-btn').disabled=false; },
+    function() {
+      uploadTask.snapshot.ref.getDownloadURL().then(function(url) {
+        var docData = {
+          name: name, cat: cat, desc: desc,
+          fileName: file.name, fileSize: file.size,
+          storagePath: path, url: url,
+          personFbKey: personKey || null,
+          createdAt: Date.now()
+        };
+        db.ref('documents').push(docData).then(function() {
+          closeModal('modal-upload-doc');
+          showNotif('✅ Dokument nahrán: '+name);
+        });
+      });
+    }
+  );
+}
+
+function openDocUrl(fbKey) {
+  var d = _allDocs.find(function(x){ return x.fbKey===fbKey; });
+  if (d && d.url) window.open(d.url, '_blank');
+}
+
+function openDocDetail(fbKey) {
+  var d = _allDocs.find(function(x){ return x.fbKey===fbKey; });
+  if (!d) return;
+  var cat = DOC_CATS[d.cat] || DOC_CATS.ostatni;
+  var personName = '';
+  if (d.personFbKey) {
+    var p = people.find(function(x){ return x.fbKey===d.personFbKey; });
+    if (p) personName = p.name+' ('+p.role+')';
+  }
+  document.getElementById('doc-detail-title').textContent = fileIcon(d.fileName)+' '+d.name;
+  document.getElementById('doc-detail-body').innerHTML =
+    '<div style="display:flex;flex-direction:column;gap:14px;">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+      +'<div><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Kategorie</div>'
+        +'<span class="doc-card-cat">'+cat.icon+' '+cat.label+'</span></div>'
+      +'<div><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Datum nahrání</div>'
+        +'<div style="font-size:13px;">'+new Date(d.createdAt).toLocaleDateString('cs-CZ')+'</div></div>'
+      +(personName ? '<div><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Zaměstnanec</div><div style="font-size:13px;">👤 '+personName+'</div></div>' : '')
+      +'<div><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Velikost</div>'
+        +'<div style="font-size:13px;">'+Math.round((d.fileSize||0)/1024)+' KB</div></div>'
+    +'</div>'
+    +(d.desc ? '<div style="background:var(--bg3);border-radius:8px;padding:12px;font-size:13px;color:var(--text-muted);">'+d.desc+'</div>' : '')
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+      +'<button class="btn btn-primary" onclick="openDocUrl(\''+d.fbKey+'\')">👁 Otevřít / Stáhnout</button>'
+      +'<button class="btn btn-danger" onclick="deleteDoc(\''+d.fbKey+'\');closeModal(\'modal-doc-detail\');">🗑 Smazat</button>'
+    +'</div>'
+    +'</div>';
+  openModal('modal-doc-detail');
+}
+
+function deleteDoc(fbKey) {
+  var d = _allDocs.find(function(x){ return x.fbKey===fbKey; });
+  if (!d) return;
+  if (!confirm('Opravdu smazat dokument "'+d.name+'"?')) return;
+  // Smaž ze Storage
+  if (d.storagePath) {
+    storage.ref(d.storagePath).delete().catch(function(){});
+  }
+  // Smaž z DB
+  db.ref('documents/'+fbKey).remove().then(function(){
+    showNotif('🗑 Dokument smazán');
+  });
+}
+
 // ─── TISK KARTY ZAMĚSTNANCE ──────────────────────────────
 function printCard(fbKey) {
   var p = people.find(function(x){ return x.fbKey === fbKey; });
@@ -1562,8 +1907,17 @@ window.setTrainingMode  = setTrainingMode;
 window.selectAllPeople  = selectAllPeople;
 window.updateSelectedCount = updateSelectedCount;
 window.printCard        = printCard;
+window.openUploadDoc    = openUploadDoc;
+window.onDocFileSelected= onDocFileSelected;
+window.uploadDocument   = uploadDocument;
+window.openDocUrl       = openDocUrl;
+window.openDocDetail    = openDocDetail;
+window.deleteDoc        = deleteDoc;
+window.filterDocs       = filterDocs;
+window.filterDocsByCat  = filterDocsByCat;
 
 startLiveSync();
+startDocsSync();
 
 } // konec initApp()
 </script>
