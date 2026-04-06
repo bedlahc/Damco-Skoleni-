@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Damco Jaroměř — Správa školení</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ── MAERSK COLOUR PALETTE ── */
+  :root {
+    /* Brand */
+    --primary:       #0073AB;   /* Maersk Blue */
+    --primary-dark:  #005580;
+    --primary-light: #E8F4FA;
+    --accent:        #00A0D2;   /* Maersk Cyan */
+
+    /* Backgrounds — light, clean */
+    --bg:   #EDF4F8;            /* page background — very light blue */
+    --bg2:  #FFFFFF;            /* cards / sidebar */
+    --bg3:  #F0F7FB;            /* table header / inputs */
+    --border: #C5DCE9;          /* blue-tinted borders */
+
+    /* Text */
+    --text:       #1A2E3B;      /* near-black navy */
+    --text-muted: #5E8098;      /* muted blue-grey */
+
+    /* Statuses */
+    --green:  #1A7A3A;
+    --yellow: #B8860B;
+    --red:    #C0392B;
+    --blue:   #0073AB;
+
+    --card-radius: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+
+  /* HEADER */
+  header {
+    background: var(--primary);
+    border-bottom: 3px solid var(--accent);
+    padding: 0 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 64px; position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,80,130,0.18);
+  }
+  .logo { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-size: 22px; letter-spacing: 2px; text-transform: uppercase; color: #fff; }
+  .logo span { color: #7FDFFF; }
+  .header-meta { font-size: 11px; color: rgba(255,255,255,0.75); text-align: right; line-height: 1.6; }
+  .header-btns { display: flex; gap: 10px; align-items: center; }
+
+  /* ALERT BANNER */
+  .alert-banner {
+    background: #FFF8E6;
+    border-bottom: 2px solid #F0C040;
+    padding: 9px 32px;
+    display: flex; gap: 20px; overflow-x: auto; align-items: center;
+  }
+  .alert-label { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; color: #7A5500; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; white-space: nowrap; }
+  .alert-chip { background: rgba(218,54,51,0.1); border: 1px solid rgba(218,54,51,0.35); border-radius: 20px; padding: 3px 12px; font-size: 12px; color: #8B1A1A; white-space: nowrap; font-weight: 600; }
+  .alert-chip.soon { background: rgba(176,120,0,0.1); border-color: rgba(176,120,0,0.35); color: #7A5500; }
+
+  /* LAYOUT */
+  .main-wrap { display: grid; grid-template-columns: 260px 1fr; min-height: calc(100vh - 108px); }
+
+  /* SIDEBAR */
+  sidebar {
+    background: var(--primary);
+    border-right: none;
+    padding: 20px 12px;
+    display: flex; flex-direction: column; gap: 3px; overflow-y: auto;
+    box-shadow: 2px 0 8px rgba(0,60,100,0.12);
+  }
+  .sidebar-section-label {
+    font-family: 'Barlow Condensed', sans-serif; font-size: 10px; letter-spacing: 2px;
+    text-transform: uppercase; color: rgba(255,255,255,0.5); padding: 12px 12px 4px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: 7px;
+    cursor: pointer; color: rgba(255,255,255,0.75); transition: all 0.15s; font-weight: 500; font-size: 13px;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .nav-item.active { background: rgba(255,255,255,0.18); color: #fff; border-left: 3px solid #7FDFFF; }
+  .nav-item .icon { font-size: 15px; }
+  .nav-badge { margin-left: auto; background: #C0392B; color: #fff; border-radius: 10px; font-size: 10px; font-weight: 700; padding: 1px 7px; }
+  .nav-badge.warn { background: #E6A800; color: #1a1a00; }
+  .nav-divider { border: none; border-top: 1px solid rgba(255,255,255,0.15); margin: 8px 0; }
+
+  /* CONTENT */
+  .content { padding: 28px 32px; overflow-y: auto; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* PAGE HEADER */
+  .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 16px; flex-wrap: wrap; }
+  .page-title { font-family: 'Barlow Condensed', sans-serif; font-size: 28px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; }
+  .page-subtitle { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+  /* STATS */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--card-radius); padding: 18px 20px; position: relative; overflow: hidden; box-shadow: 0 1px 4px rgba(0,80,130,0.07); }
+  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+  .stat-card.ok::before    { background: var(--green); }
+  .stat-card.warn::before  { background: var(--yellow); }
+  .stat-card.danger::before{ background: var(--red); }
+  .stat-card.info::before  { background: var(--primary); }
+  .stat-number { font-family: 'Barlow Condensed', sans-serif; font-size: 36px; font-weight: 800; color: var(--primary); line-height: 1; }
+  .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+  /* FILTER BAR */
+  .filter-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+  .search-input { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; color: var(--text); font-size: 13px; font-family: 'Barlow', sans-serif; flex: 1; min-width: 200px; outline: none; transition: border-color 0.2s; }
+  .search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,115,171,0.12); }
+  .search-input::placeholder { color: var(--text-muted); }
+  select.filter-select { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 13px; font-family: 'Barlow', sans-serif; outline: none; cursor: pointer; }
+
+  /* BUTTONS */
+  .btn { padding: 8px 18px; border-radius: 8px; border: none; font-family: 'Barlow Condensed', sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+  .btn-ghost:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+  .btn-danger { background: transparent; border: 1px solid rgba(192,57,43,0.4); color: var(--red); }
+  .btn-danger:hover { background: rgba(192,57,43,0.08); }
+  .btn-sm  { padding: 5px 12px; font-size: 12px; }
+  .btn-xs  { padding: 3px 9px; font-size: 11px; }
+
+  /* TABLE */
+  .table-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--card-radius); overflow: auto; box-shadow: 0 1px 4px rgba(0,80,130,0.07); }
+  table { width: 100%; border-collapse: collapse; }
+  thead { background: var(--primary); position: sticky; top: 0; }
+  th { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,0.85); padding: 12px 16px; text-align: left; border-bottom: 2px solid var(--accent); white-space: nowrap; }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; font-size: 13px; color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--primary-light); }
+
+  .person-cell { display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 12px; color: #fff; flex-shrink: 0; }
+  .person-name { font-weight: 600; color: var(--text); }
+  .person-role { font-size: 11px; color: var(--text-muted); }
+
+  /* BADGES */
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; white-space: nowrap; }
+  .badge-ok     { background: #E6F4EC; color: #1A7A3A; border: 1px solid #A8D8B5; }
+  .badge-warn   { background: #FFF8E1; color: #8A6200; border: 1px solid #F0CE6A; }
+  .badge-danger { background: #FDECEA; color: #8B1A1A; border: 1px solid #F5B4B0; }
+  .badge-info   { background: var(--primary-light); color: var(--primary); border: 1px solid #A0C8E0; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+
+  /* PROGRESS */
+  .prog-wrap { display: flex; gap: 3px; }
+  .prog-seg { height: 6px; border-radius: 3px; flex: 1; }
+  .prog-seg.done   { background: #2EAA55; }
+  .prog-seg.warn   { background: #E6A800; }
+  .prog-seg.miss   { background: var(--border); }
+  .prog-seg.overdue{ background: #C0392B; }
+
+  /* MODAL */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,50,80,0.55); z-index: 200; align-items: center; justify-content: center; padding: 20px; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; animation: modalIn 0.2s ease; box-shadow: 0 8px 40px rgba(0,60,100,0.22); }
+  @keyframes modalIn { from { opacity:0; transform:translateY(-16px); } to { opacity:1; transform:translateY(0); } }
+  .modal-header { padding: 18px 24px 14px; border-bottom: 2px solid var(--primary); display: flex; align-items: center; justify-content: space-between; background: var(--primary-light); border-radius: 12px 12px 0 0; }
+  .modal-title { font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 700; color: var(--primary); text-transform: uppercase; }
+  .modal-close { background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; line-height: 1; padding: 4px; }
+  .modal-close:hover { color: var(--red); }
+  .modal-body { padding: 20px 24px; }
+
+  /* FORM */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+  .form-input { background: var(--bg3); border: 1px solid var(--border); border-radius: 7px; padding: 9px 12px; color: var(--text); font-size: 13px; font-family: 'Barlow', sans-serif; outline: none; transition: border-color 0.2s; width: 100%; }
+  .form-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0,115,171,0.1); }
+  .form-input::placeholder { color: var(--text-muted); }
+  .form-hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* UPLOAD */
+  .upload-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 18px; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; background: var(--bg3); }
+  .upload-zone:hover { border-color: var(--primary); background: var(--primary-light); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 24px; margin-bottom: 6px; }
+  .upload-text { font-size: 13px; color: var(--text-muted); }
+  .upload-text strong { color: var(--primary); }
+  .upload-meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+  .file-list { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+  .file-item { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .file-item .file-name { flex: 1; color: var(--text); }
+  .file-item .file-size { color: var(--text-muted); }
+  .file-remove { background: none; border: none; color: var(--red); cursor: pointer; font-size: 14px; line-height: 1; }
+
+  /* TYPE TAGS */
+  .type-tag { display: inline-block; padding: 2px 9px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+
+  /* TRAINING TYPE CARDS */
+  .type-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 14px; margin-bottom: 24px; }
+  .type-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--card-radius); padding: 16px 18px; display: flex; align-items: center; gap: 14px; box-shadow: 0 1px 4px rgba(0,80,130,0.07); transition: box-shadow 0.15s; }
+  .type-card:hover { box-shadow: 0 3px 12px rgba(0,80,130,0.14); }
+  .type-card-icon { font-size: 24px; }
+  .type-card-info { flex: 1; }
+  .type-card-name { font-weight: 600; color: var(--text); font-size: 14px; }
+  .type-card-validity { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .type-card-actions { display: flex; gap: 6px; }
+
+  /* TIMELINE */
+  .timeline { display: flex; flex-direction: column; }
+  .tl-item { display: flex; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .tl-item:last-child { border-bottom: none; }
+  .tl-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+  .tl-content { flex: 1; }
+  .tl-name { font-weight: 600; color: var(--text); font-size: 13px; }
+  .tl-date { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .tl-days { font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700; white-space: nowrap; }
+
+  /* NOTIFICATION */
+  .notif { position: fixed; bottom: 24px; right: 24px; background: var(--primary); color: #fff; padding: 12px 20px; border-radius: 8px; font-weight: 600; font-size: 13px; box-shadow: 0 4px 20px rgba(0,60,100,0.3); transform: translateY(80px); opacity: 0; transition: all 0.3s; z-index: 300; }
+  .notif.show { transform: translateY(0); opacity: 1; }
+
+  /* COLOR PICKER */
+  .color-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .color-dot { width: 24px; height: 24px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s; }
+  .color-dot.selected { border-color: var(--primary); outline: 2px solid var(--primary); outline-offset: 1px; }
+
+  /* ICON PICKER */
+  .icon-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .icon-opt { width: 36px; height: 36px; border-radius: 6px; background: var(--bg3); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; transition: all 0.15s; }
+  .icon-opt:hover, .icon-opt.selected { background: var(--primary-light); border-color: var(--primary); }
+
+  /* SECTION HEADERS inside content */
+  .section-heading { font-family: 'Barlow Condensed', sans-serif; font-size: 15px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+
+  @media (max-width: 800px) {
+    .main-wrap { grid-template-columns: 1fr; }
+    sidebar { display: none; }
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo"><span>Damco</span> Jaroměř</div>
+  <div class="header-btns">
+    <button class="btn" onclick="showPage('types',null)" style="font-size:13px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);">⚙️ Typy školení</button>
+    <button class="btn" onclick="openAddPerson()" style="background:#fff;color:var(--primary);font-weight:800;">+ Přidat osobu</button>
+    <div class="header-meta">Správa školení<br><span id="todayDate"></span></div>
+  </div>
+</header>
+
+<!-- ALERT BANNER -->
+<div class="alert-banner">
+  <div class="alert-label">⚠ Upozornění</div>
+  <div class="alert-items" id="alertItems" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+</div>
+
+<!-- MAIN -->
+<div class="main-wrap">
+<sidebar id="sidebar">
+  <div class="sidebar-section-label">Přehled</div>
+  <div class="nav-item active" onclick="showPage('dashboard',this)"><span class="icon">📊</span> Dashboard</div>
+  <div class="nav-item" onclick="showPage('people',this)"><span class="icon">👥</span> Seznam osob <span class="nav-badge" id="nav-cnt">—</span></div>
+  <div class="nav-item" onclick="showPage('upcoming',this)"><span class="icon">🔔</span> Nadcházející <span class="nav-badge warn" id="nav-alert">—</span></div>
+
+  <hr class="nav-divider">
+  <div class="sidebar-section-label">Typy školení</div>
+  <div id="type-nav-items"></div>
+
+  <hr class="nav-divider">
+  <div class="sidebar-section-label">Akce</div>
+  <div class="nav-item" onclick="openAddTraining()"><span class="icon">➕</span> Přidat školení</div>
+  <div class="nav-item" onclick="showPage('types',null)"><span class="icon">⚙️</span> Spravovat typy</div>
+</sidebar>
+
+<div class="content">
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div class="page-header">
+      <div><div class="page-title">Dashboard</div><div class="page-subtitle">Damco Jaroměř — přehled školení zaměstnanců</div></div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card ok"><div class="stat-number" id="stat-ok">—</div><div class="stat-label">✅ Platných školení</div></div>
+      <div class="stat-card warn"><div class="stat-number" id="stat-exp">—</div><div class="stat-label">⏳ Expiruje do 30 dní</div></div>
+      <div class="stat-card danger"><div class="stat-number" id="stat-over">—</div><div class="stat-label">❌ Prošlých školení</div></div>
+      <div class="stat-card info"><div class="stat-number" id="stat-ppl">—</div><div class="stat-label">👥 Zaměstnanců</div></div>
+    </div>
+    <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">🔔 Urgentní přehled</div>
+    <div class="table-wrap">
+      <table><thead><tr><th>Zaměstnanec</th><th>Typ školení</th><th>Absolvováno</th><th>Platnost do</th><th>Stav</th></tr></thead>
+      <tbody id="dash-tbody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- PEOPLE -->
+  <div class="page" id="page-people">
+    <div class="page-header">
+      <div><div class="page-title">Seznam osob</div><div class="page-subtitle">Všichni zaměstnanci a jejich školení</div></div>
+      <button class="btn btn-primary" onclick="openAddPerson()">+ Přidat osobu</button>
+    </div>
+    <div class="filter-bar">
+      <input type="text" class="search-input" placeholder="Hledat jméno nebo pozici…" oninput="filterPeople(this.value)">
+      <select class="filter-select" onchange="filterByStatus(this.value)">
+        <option value="">Všechny stavy</option>
+        <option value="ok">Platné</option>
+        <option value="expiring">Brzy expiruje</option>
+        <option value="expired">Prošlé</option>
+        <option value="missing">Chybí</option>
+      </select>
+    </div>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table><thead id="people-thead"><tr></tr></thead><tbody id="people-tbody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- UPCOMING -->
+  <div class="page" id="page-upcoming">
+    <div class="page-header"><div><div class="page-title">Nadcházející školení</div><div class="page-subtitle">Prošlá a brzy expirující — seřazeno podle naléhavosti</div></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#C0392B;text-transform:uppercase;margin-bottom:12px;letter-spacing:1px;">❌ Prošlá školení</div>
+        <div class="table-wrap"><div style="padding:0 8px;" class="timeline" id="expired-list"></div></div>
+      </div>
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:#8A6200;text-transform:uppercase;margin-bottom:12px;letter-spacing:1px;">⏳ Expiruje do 30 dní</div>
+        <div class="table-wrap"><div style="padding:0 8px;" class="timeline" id="expiring-list"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TYPE-SPECIFIC PAGE -->
+  <div class="page" id="page-type-detail">
+    <div class="page-header">
+      <div><div class="page-title" id="type-detail-title">Školení</div><div class="page-subtitle" id="type-detail-sub"></div></div>
+    </div>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table><thead><tr><th>Zaměstnanec</th><th>Absolvováno</th><th>Platnost do</th><th>Stav</th><th>Dokument</th></tr></thead>
+      <tbody id="type-detail-tbody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- MANAGE TYPES -->
+  <div class="page" id="page-types">
+    <div class="page-header">
+      <div><div class="page-title">⚙️ Typy školení</div><div class="page-subtitle">Přidejte, upravte nebo odstraňte typy školení</div></div>
+      <button class="btn btn-primary" onclick="openAddType()">+ Nový typ</button>
+    </div>
+    <div class="type-cards" id="type-cards-wrap"></div>
+    <div style="background:var(--primary-light);border:1px solid var(--border);border-left:4px solid var(--primary);border-radius:var(--card-radius);padding:16px 20px;font-size:13px;color:var(--text-muted);">
+      💡 <strong style="color:var(--primary);">Jak to funguje:</strong> Každý typ školení má platnost <strong style="color:var(--primary);">1 rok</strong>. Po přidání nového typu se automaticky zobrazí ve všech přehledech a u každé osoby.
+    </div>
+  </div>
+
+</div><!-- /content -->
+</div><!-- /main-wrap -->
+
+<!-- ============= MODAL: ADD PERSON ============= -->
+<div class="modal-bg" id="modal-person">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Přidat zaměstnance</div>
+      <button class="modal-close" onclick="closeModal('modal-person')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Jméno a příjmení *</label>
+          <input type="text" class="form-input" id="p-name" placeholder="Jan Novák">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Pozice / Role *</label>
+          <input type="text" class="form-input" id="p-role" placeholder="Operátor, Skladník…">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Oddělení</label>
+          <input type="text" class="form-input" id="p-dept" placeholder="Sklad, Výroba…">
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-mail</label>
+          <input type="email" class="form-input" id="p-email" placeholder="jan.novak@damco.cz">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefon</label>
+          <input type="text" class="form-input" id="p-phone" placeholder="+420 …">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Datum nástupu</label>
+          <input type="date" class="form-input" id="p-startdate">
+        </div>
+
+        <div class="form-group full">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;border-top:1px solid var(--border);padding-top:14px;">Absolvovaná školení (datum)</div>
+          <div id="person-training-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"></div>
+        </div>
+
+        <div class="form-group full">
+          <label class="form-label">Nahrát doklady o školení</label>
+          <div class="upload-zone">
+            <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onchange="handleFileUpload(event,'person-files')">
+            <div class="upload-icon">📎</div>
+            <div class="upload-text">Přetáhněte nebo <strong>klikněte pro výběr</strong></div>
+            <div class="upload-meta">PDF, JPG, PNG, DOC — max. 10 MB</div>
+          </div>
+          <div class="file-list" id="person-files"></div>
+        </div>
+
+        <div class="form-group full">
+          <label class="form-label">Poznámka</label>
+          <textarea class="form-input" id="p-note" rows="2" placeholder="Volitelná poznámka…" style="resize:vertical;"></textarea>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+        <button class="btn btn-ghost" onclick="closeModal('modal-person')">Zrušit</button>
+        <button class="btn btn-primary" onclick="savePerson()">Uložit osobu</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============= MODAL: EDIT PERSON ============= -->
+<div class="modal-bg" id="modal-edit-person">
+  <div class="modal" style="max-width:660px;">
+    <div class="modal-header">
+      <div class="modal-title" id="edit-person-title">Upravit zaměstnance</div>
+      <button class="modal-close" onclick="closeModal('modal-edit-person')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="ep-id">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Jméno a příjmení *</label>
+          <input type="text" class="form-input" id="ep-name" placeholder="Jan Novák">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Pozice / Role *</label>
+          <input type="text" class="form-input" id="ep-role" placeholder="Operátor, Skladník…">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Oddělení</label>
+          <input type="text" class="form-input" id="ep-dept" placeholder="Sklad, Výroba…">
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-mail</label>
+          <input type="email" class="form-input" id="ep-email" placeholder="jan.novak@damco.cz">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefon</label>
+          <input type="text" class="form-input" id="ep-phone" placeholder="+420 …">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Datum nástupu</label>
+          <input type="date" class="form-input" id="ep-startdate">
+        </div>
+
+        <div class="form-group full">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;border-top:1px solid var(--border);padding-top:14px;">Školení — data absolvování</div>
+          <div id="edit-person-training-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"></div>
+        </div>
+
+        <div class="form-group full">
+          <label class="form-label">Nahrát / aktualizovat doklady</label>
+          <div class="upload-zone">
+            <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onchange="handleFileUpload(event,'ep-files')">
+            <div class="upload-icon">📎</div>
+            <div class="upload-text">Přetáhněte nebo <strong>klikněte pro výběr</strong></div>
+            <div class="upload-meta">PDF, JPG, PNG, DOC — max. 10 MB</div>
+          </div>
+          <div class="file-list" id="ep-files"></div>
+        </div>
+
+        <div class="form-group full">
+          <label class="form-label">Poznámka</label>
+          <textarea class="form-input" id="ep-note" rows="2" placeholder="Volitelná poznámka…" style="resize:vertical;"></textarea>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:space-between;margin-top:20px;flex-wrap:wrap;">
+        <button class="btn btn-danger" onclick="deletePerson()">🗑 Smazat osobu</button>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-ghost" onclick="closeModal('modal-edit-person')">Zrušit</button>
+          <button class="btn btn-primary" onclick="updatePerson()">💾 Uložit změny</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============= MODAL: ADD TRAINING ============= -->
+<div class="modal-bg" id="modal-training">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Přidat / Aktualizovat školení</div>
+      <button class="modal-close" onclick="closeModal('modal-training')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Zaměstnanec *</label>
+          <select class="form-input" id="t-person"><option value="">— vyberte osobu —</option></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Typ školení *</label>
+          <select class="form-input" id="t-type"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Datum absolvování *</label>
+          <input type="date" class="form-input" id="t-date">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Lektor / Organizace</label>
+          <input type="text" class="form-input" id="t-instructor" placeholder="Interní / Název firmy">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Číslo osvědčení</label>
+          <input type="text" class="form-input" id="t-cert" placeholder="např. BEZ-2025-001">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Platnost</label>
+          <div class="form-input" style="background:var(--bg3);color:var(--text-muted);">1 rok (pevně)</div>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Nahrát certifikát / protokol</label>
+          <div class="upload-zone">
+            <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" onchange="handleFileUpload(event,'training-files')">
+            <div class="upload-icon">📄</div>
+            <div class="upload-text">Přetáhněte nebo <strong>klikněte</strong></div>
+            <div class="upload-meta">PDF, JPG, PNG — max. 10 MB</div>
+          </div>
+          <div class="file-list" id="training-files"></div>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Poznámka</label>
+          <textarea class="form-input" id="t-note" rows="2" placeholder="Volitelná poznámka…" style="resize:vertical;"></textarea>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+        <button class="btn btn-ghost" onclick="closeModal('modal-training')">Zrušit</button>
+        <button class="btn btn-primary" onclick="saveTraining()">Uložit školení</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============= MODAL: ADD/EDIT TYPE ============= -->
+<div class="modal-bg" id="modal-type">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title" id="type-modal-title">Nový typ školení</div>
+      <button class="modal-close" onclick="closeModal('modal-type')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Název školení *</label>
+          <input type="text" class="form-input" id="ty-name" placeholder="např. Požární ochrana">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Vyberte ikonu</label>
+          <div class="icon-row" id="icon-row"></div>
+          <input type="hidden" id="ty-icon" value="📝">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Barva štítku</label>
+          <div class="color-row" id="color-row"></div>
+          <input type="hidden" id="ty-color" value="#E8500A">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Popis (volitelný)</label>
+          <input type="text" class="form-input" id="ty-desc" placeholder="Krátký popis školení">
+          <div class="form-hint">Platnost je vždy 1 rok od data absolvování.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+        <button class="btn btn-ghost" onclick="closeModal('modal-type')">Zrušit</button>
+        <button class="btn btn-primary" onclick="saveType()">Uložit typ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="notif" id="notif"></div>
+
+<script type="module">
+// ─── FIREBASE SETUP ───────────────────────────────────────────────────
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, remove, onValue, push }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCngZ7woRCjNJKJozrz3091FJQRMweINdY",
+  authDomain: "damco-jaromer-skoleni.firebaseapp.com",
+  databaseURL: "https://damco-jaromer-skoleni-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "damco-jaromer-skoleni",
+  storageBucket: "damco-jaromer-skoleni.firebasestorage.app",
+  messagingSenderId: "847241205611",
+  appId: "1:847241205611:web:32edd8eb191bba9ceade2e"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getDatabase(app);
+
+// ─── LOADING OVERLAY ──────────────────────────────────────────────────
+function setLoading(on) {
+  let ov = document.getElementById('fb-loading');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'fb-loading';
+    ov.innerHTML = `<div style="text-align:center;">
+      <div style="font-size:36px;margin-bottom:12px;">🔄</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;color:var(--primary);letter-spacing:1px;">Načítám data…</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-top:6px;">Připojuji se k Firebase</div>
+    </div>`;
+    Object.assign(ov.style, {
+      position:'fixed', inset:'0', background:'rgba(237,244,248,0.92)',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      zIndex:'9999', backdropFilter:'blur(4px)'
+    });
+    document.body.appendChild(ov);
+  }
+  ov.style.display = on ? 'flex' : 'none';
+}
+
+// ─── DEFAULT TRAINING TYPES ───────────────────────────────────────────
+const DEFAULT_TYPES = [
+  { id:'bezpecnost', name:'Bezpečnost',    icon:'🦺',  color:'#DA3633', desc:'BOZP školení' },
+  { id:'vozik',      name:'Řízení vozíků', icon:'🏗️',  color:'#388BFD', desc:'Řidičské oprávnění VZV' },
+  { id:'instrukce',  name:'Instrukce',     icon:'📋',  color:'#2EA043', desc:'Pracovní instrukce' },
+];
+
+let trainingTypes = [];
+let nextTypeId = 100;
+
+// ─── PEOPLE (načítá se z Firebase) ───────────────────────────────────
+let people = [];
+let nextPersonId = Date.now(); // unique ID base
+
+// ─── FIREBASE: SAVE / LOAD ────────────────────────────────────────────
+async function fbSavePeople() {
+  const obj = {};
+  people.forEach(p => { obj[p.fbKey || p.id] = p; });
+  await set(ref(db, 'people'), obj);
+}
+
+async function fbSaveTypes() {
+  await set(ref(db, 'trainingTypes'), trainingTypes);
+}
+
+async function fbDeletePerson(fbKey) {
+  await remove(ref(db, 'people/' + fbKey));
+}
+
+// Live sync — whenever DB changes, update UI
+function startLiveSync() {
+  // People
+  onValue(ref(db, 'people'), snap => {
+    const data = snap.val();
+    if (data) {
+      people = Object.entries(data).map(([key, p]) => ({ ...p, fbKey: key }));
+    } else {
+      people = [];
+    }
+    normalizeTrainings();
+    refreshCurrentPage();
+  });
+
+  // Training types
+  onValue(ref(db, 'trainingTypes'), snap => {
+    const data = snap.val();
+    if (data && Array.isArray(data) && data.length > 0) {
+      trainingTypes = data;
+    } else if (data && typeof data === 'object') {
+      trainingTypes = Object.values(data);
+    } else {
+      // First run — write defaults
+      trainingTypes = DEFAULT_TYPES;
+      fbSaveTypes();
+    }
+    buildSidebarTypes();
+    refreshCurrentPage();
+  });
+}
+
+let _currentPage = 'dashboard';
+function refreshCurrentPage() {
+  if (_currentPage === 'dashboard') renderDashboard();
+  else if (_currentPage === 'people') renderPeople();
+  else if (_currentPage === 'upcoming') renderUpcoming();
+  else if (_currentPage === 'types') renderTypesPage();
+}
+
+
+// ─── HELPERS ──────────────────────────────────────────────────────────
+const VALIDITY_YEARS = 1;
+const today = new Date(); today.setHours(0,0,0,0);
+
+function addYears(dateStr, y) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  d.setFullYear(d.getFullYear() + y);
+  return d;
+}
+function daysDiff(d) { return d ? Math.round((d - today) / 86400000) : null; }
+function fmtDate(s) { if (!s) return '—'; return new Date(s).toLocaleDateString('cs-CZ'); }
+function initials(n) { return n.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase(); }
+
+function getStatus(dateStr) {
+  if (!dateStr) return 'missing';
+  const exp = addYears(dateStr, VALIDITY_YEARS);
+  const diff = daysDiff(exp);
+  if (diff < 0) return 'expired';
+  if (diff <= 30) return 'expiring';
+  return 'ok';
+}
+
+function statusBadge(s) {
+  return {
+    ok:      '<span class="badge badge-ok"><span class="dot"></span>Platné</span>',
+    expiring:'<span class="badge badge-warn"><span class="dot"></span>Brzy expiruje</span>',
+    expired: '<span class="badge badge-danger"><span class="dot"></span>Prošlé</span>',
+    missing: '<span class="badge badge-info"><span class="dot"></span>Chybí</span>',
+  }[s] || '—';
+}
+
+function typeTag(type) {
+  return `<span class="type-tag" style="background:${hexAlpha(type.color,0.15)};color:${type.color};">${type.icon} ${type.name}</span>`;
+}
+function hexAlpha(hex, a) {
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// ─── ENSURE ALL PEOPLE HAVE ALL TRAINING KEYS ─────────────────────────
+function normalizeTrainings() {
+  people.forEach(p => {
+    trainingTypes.forEach(t => {
+      if (!(t.id in p.trainings)) p.trainings[t.id] = null;
+    });
+  });
+}
+
+// ─── NAVIGATION ───────────────────────────────────────────────────────
+function showPage(id, el) {
+  _currentPage = id;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const pg = document.getElementById('page-'+id);
+  if (pg) { pg.classList.add('active'); }
+  if (el) el.classList.add('active');
+  if (id==='dashboard') renderDashboard();
+  else if (id==='people') renderPeople();
+  else if (id==='upcoming') renderUpcoming();
+  else if (id==='types') renderTypesPage();
+}
+
+function showTypeDetail(typeId) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const type = trainingTypes.find(t=>t.id===typeId);
+  if (!type) return;
+  document.getElementById('type-detail-title').textContent = type.icon + ' ' + type.name;
+  document.getElementById('type-detail-sub').textContent = 'Opakování každý rok · ' + (type.desc||'');
+  const tbody = document.getElementById('type-detail-tbody');
+  const sorted = [...people].sort((a,b)=>{
+    const order = {expired:0,expiring:1,missing:2,ok:3};
+    return (order[getStatus(a.trainings[typeId])]||0) - (order[getStatus(b.trainings[typeId])]||0);
+  });
+  tbody.innerHTML = sorted.map(p => {
+    const s = getStatus(p.trainings[typeId]);
+    const exp = p.trainings[typeId] ? addYears(p.trainings[typeId], VALIDITY_YEARS) : null;
+    return `<tr>
+      <td><div class="person-cell"><div class="avatar">${initials(p.name)}</div><div><div class="person-name">${p.name}</div><div class="person-role">${p.role}</div></div></div></td>
+      <td>${p.trainings[typeId] ? fmtDate(p.trainings[typeId]) : '<span style="color:var(--text-muted)">—</span>'}</td>
+      <td>${exp ? exp.toLocaleDateString('cs-CZ') : '—'}</td>
+      <td>${statusBadge(s)}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="openEditTraining('${p.fbKey||p.id}','${typeId}')">📎 Aktualizovat</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('page-type-detail').classList.add('active');
+}
+
+// ─── BUILD SIDEBAR TYPES ──────────────────────────────────────────────
+function buildSidebarTypes() {
+  const el = document.getElementById('type-nav-items');
+  el.innerHTML = trainingTypes.map(t => `
+    <div class="nav-item" onclick="showTypeDetail('${t.id}')">
+      <span class="icon">${t.icon}</span> ${t.name}
+    </div>`).join('');
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────
+function renderDashboard() {
+  normalizeTrainings();
+  let okN=0, expN=0, overN=0;
+  const rows=[];
+
+  people.forEach(p => {
+    trainingTypes.forEach(type => {
+      const s = getStatus(p.trainings[type.id]);
+      if (s==='ok') okN++;
+      else if (s==='expiring') expN++;
+      else if (s==='expired') overN++;
+      if (s!=='ok' && s!=='missing') {
+        const exp = addYears(p.trainings[type.id], VALIDITY_YEARS);
+        rows.push({ p, type, s, exp, diff: daysDiff(exp) });
+      }
+    });
+  });
+
+  document.getElementById('stat-ok').textContent = okN;
+  document.getElementById('stat-exp').textContent = expN;
+  document.getElementById('stat-over').textContent = overN;
+  document.getElementById('stat-ppl').textContent = people.length;
+
+  rows.sort((a,b) => {
+    if (a.s==='expired'&&b.s!=='expired') return -1;
+    if (b.s==='expired'&&a.s!=='expired') return 1;
+    return (a.diff||999)-(b.diff||999);
+  });
+
+  document.getElementById('dash-tbody').innerHTML = rows.slice(0,12).map(({p,type,s,exp,diff}) => `
+    <tr>
+      <td><div class="person-cell"><div class="avatar">${initials(p.name)}</div><div><div class="person-name">${p.name}</div><div class="person-role">${p.role}</div></div></div></td>
+      <td>${typeTag(type)}</td>
+      <td>${fmtDate(p.trainings[type.id])}</td>
+      <td>${exp ? exp.toLocaleDateString('cs-CZ') : '—'}</td>
+      <td>${statusBadge(s)}</td>
+    </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px;">✅ Vše v pořádku</td></tr>';
+
+  renderAlertBanner();
+  document.getElementById('nav-cnt').textContent = people.length;
+  const alertCount = expN + overN;
+  const nb = document.getElementById('nav-alert');
+  nb.textContent = alertCount;
+  nb.style.display = alertCount > 0 ? '' : 'none';
+}
+
+function renderAlertBanner() {
+  const items = [];
+  people.forEach(p => {
+    trainingTypes.forEach(type => {
+      const s = getStatus(p.trainings[type.id]);
+      if (s==='expired') items.push(`<div class="alert-chip">❌ ${p.name} – ${type.name}</div>`);
+      else if (s==='expiring') {
+        const diff = daysDiff(addYears(p.trainings[type.id], VALIDITY_YEARS));
+        items.push(`<div class="alert-chip soon">⏳ ${p.name} – ${type.name} (${diff}d)</div>`);
+      }
+    });
+  });
+  document.getElementById('alertItems').innerHTML = items.length ? items.join('') : '<span style="color:var(--text-muted);font-size:12px;">Žádná upozornění</span>';
+}
+
+// ─── PEOPLE TABLE (dynamic columns) ───────────────────────────────────
+let _filterText='', _filterStatus='';
+
+function renderPeople(list) {
+  normalizeTrainings();
+  list = list || people;
+  if (_filterText) list = list.filter(p => p.name.toLowerCase().includes(_filterText)||p.role.toLowerCase().includes(_filterText));
+  if (_filterStatus) list = list.filter(p => trainingTypes.some(t => getStatus(p.trainings[t.id])===_filterStatus));
+
+  // Build header
+  document.getElementById('people-thead').innerHTML = '<tr>' +
+    '<th>Zaměstnanec</th>' +
+    trainingTypes.map(t=>`<th>${t.icon} ${t.name}</th>`).join('') +
+    '<th>Průběh</th><th>Akce</th></tr>';
+
+  const segMap = s => ({ok:'done',expiring:'warn',expired:'overdue',missing:'miss'}[s]||'miss');
+
+  document.getElementById('people-tbody').innerHTML = list.map(p => {
+    const cols = trainingTypes.map(t => {
+      const s = getStatus(p.trainings[t.id]);
+      return `<td>${statusBadge(s)}<div style="font-size:10px;color:var(--text-muted);margin-top:3px;">${p.trainings[t.id]?fmtDate(p.trainings[t.id]):'Chybí'}</div></td>`;
+    }).join('');
+    const segs = trainingTypes.map(t=>`<div class="prog-seg ${segMap(getStatus(p.trainings[t.id]))}" title="${t.name}"></div>`).join('');
+    return `<tr>
+      <td><div class="person-cell"><div class="avatar">${initials(p.name)}</div><div><div class="person-name">${p.name}</div><div class="person-role">${p.role} · ${p.dept}</div></div></div></td>
+      ${cols}
+      <td><div class="prog-wrap">${segs}</div></td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-ghost btn-sm" onclick="openEditPerson('${p.fbKey||p.id}')" title="Upravit osobu" style="margin-right:4px;">✏️ Upravit</button>
+        <button class="btn btn-ghost btn-sm" onclick="openEditTraining('${p.fbKey||p.id}')" title="Přidat školení">➕ Školení</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterPeople(v) { _filterText=v.toLowerCase(); renderPeople(); }
+function filterByStatus(v) { _filterStatus=v; renderPeople(); }
+
+// ─── UPCOMING ─────────────────────────────────────────────────────────
+function renderUpcoming() {
+  normalizeTrainings();
+  const expired=[], expiring=[];
+  people.forEach(p => {
+    trainingTypes.forEach(type => {
+      const s = getStatus(p.trainings[type.id]);
+      const exp = p.trainings[type.id] ? addYears(p.trainings[type.id], VALIDITY_YEARS) : null;
+      const diff = daysDiff(exp);
+      if (s==='expired') expired.push({p,type,diff,exp});
+      else if (s==='expiring') expiring.push({p,type,diff,exp});
+    });
+  });
+  expired.sort((a,b)=>(a.diff||0)-(b.diff||0));
+  expiring.sort((a,b)=>(a.diff||999)-(b.diff||999));
+
+  function renderList(arr, id) {
+    const el = document.getElementById(id);
+    if (!arr.length) { el.innerHTML='<div style="padding:16px;color:var(--text-muted);font-size:13px;">Žádné záznamy</div>'; return; }
+    el.innerHTML = arr.map(({p,type,diff,exp}) => `
+      <div class="tl-item">
+        <div class="tl-dot" style="background:${diff<0?'#C0392B':'#E6A800'}"></div>
+        <div class="tl-content">
+          <div class="tl-name">${p.name}</div>
+          <div class="tl-date">${typeTag(type)} · ${exp?exp.toLocaleDateString('cs-CZ'):'—'}</div>
+        </div>
+        <div class="tl-days" style="color:${diff<0?'#C0392B':'#8A6200'}">
+          ${diff<0?Math.abs(diff)+'d po':'za '+diff+'d'}
+        </div>
+      </div>`).join('');
+  }
+  renderList(expired,'expired-list');
+  renderList(expiring,'expiring-list');
+}
+
+// ─── TYPES PAGE ───────────────────────────────────────────────────────
+function renderTypesPage() {
+  document.getElementById('type-cards-wrap').innerHTML = trainingTypes.map(t => `
+    <div class="type-card">
+      <div class="type-card-icon">${t.icon}</div>
+      <div class="type-card-info">
+        <div class="type-card-name">${t.name}</div>
+        <div class="type-card-validity">${t.desc||''} · Platnost 1 rok</div>
+      </div>
+      <div class="type-card-actions">
+        <button class="btn btn-ghost btn-xs" onclick="openEditType('${t.id}')">✏️</button>
+        ${trainingTypes.length>1?`<button class="btn btn-danger btn-xs" onclick="deleteType('${t.id}')">🗑</button>`:''}
+      </div>
+    </div>`).join('');
+}
+
+// ─── MODALS ───────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function openAddPerson() {
+  normalizeTrainings();
+  ['p-name','p-role','p-dept','p-email','p-phone','p-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('p-startdate').value = '';
+  document.getElementById('person-files').innerHTML = '';
+  // Build training date fields
+  const fields = document.getElementById('person-training-fields');
+  fields.innerHTML = trainingTypes.map(t => `
+    <div class="form-group">
+      <label class="form-label">${t.icon} ${t.name}</label>
+      <input type="date" class="form-input" id="pf-${t.id}">
+    </div>`).join('');
+  openModal('modal-person');
+}
+
+// ─── PERSON MODAL HELPERS ────────────────────────────────────────────
+function openAddPerson() {
+  normalizeTrainings();
+  ['p-name','p-role','p-dept','p-email','p-phone','p-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('p-startdate').value = '';
+  document.getElementById('person-files').innerHTML = '';
+  const fields = document.getElementById('person-training-fields');
+  fields.innerHTML = trainingTypes.map(t => `
+    <div class="form-group">
+      <label class="form-label">${t.icon} ${t.name}</label>
+      <input type="date" class="form-input" id="pf-${t.id}">
+    </div>`).join('');
+  openModal('modal-person');
+}
+
+async function savePerson() {
+  const name = document.getElementById('p-name').value.trim();
+  const role = document.getElementById('p-role').value.trim();
+  if (!name||!role) { showNotif('Vyplňte jméno a pozici',true); return; }
+  const trainings = {};
+  trainingTypes.forEach(t => { trainings[t.id] = document.getElementById('pf-'+t.id)?.value || null; });
+  const newPerson = {
+    id: Date.now(), name, role,
+    dept: document.getElementById('p-dept').value.trim(),
+    email: document.getElementById('p-email').value.trim(),
+    phone: document.getElementById('p-phone').value.trim(),
+    startDate: document.getElementById('p-startdate').value,
+    trainings, files:[], note: document.getElementById('p-note').value.trim()
+  };
+  try {
+    const newRef = push(ref(db, 'people'));
+    newPerson.fbKey = newRef.key;
+    await set(newRef, newPerson);
+    closeModal('modal-person');
+    showNotif('✅ Osoba přidána — ' + name);
+  } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
+}
+
+// ─── TRAINING MODAL ───────────────────────────────────────────────────
+function openAddTraining() {
+  const sel = document.getElementById('t-person');
+  sel.innerHTML = '<option value="">— vyberte osobu —</option>' +
+    people.map(p=>`<option value="${p.fbKey||p.id}">${p.name}</option>`).join('');
+  const tsel = document.getElementById('t-type');
+  tsel.innerHTML = trainingTypes.map(t=>`<option value="${t.id}">${t.icon} ${t.name}</option>`).join('');
+  document.getElementById('training-files').innerHTML='';
+  ['t-date','t-instructor','t-cert','t-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  openModal('modal-training');
+}
+
+function openEditTraining(fbKey, preselect) {
+  openAddTraining();
+  document.getElementById('t-person').value = fbKey;
+  if (preselect) document.getElementById('t-type').value = preselect;
+}
+
+async function saveTraining() {
+  const fbKey = document.getElementById('t-person').value;
+  const type  = document.getElementById('t-type').value;
+  const date  = document.getElementById('t-date').value;
+  if (!fbKey||!date) { showNotif('Vyplňte osobu a datum',true); return; }
+  const person = people.find(p=>(p.fbKey||p.id)==fbKey);
+  if (!person) return;
+  person.trainings[type] = date;
+  try {
+    await set(ref(db, 'people/' + (person.fbKey||person.id)), person);
+    closeModal('modal-training');
+    showNotif('✅ Školení uloženo');
+  } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
+}
+
+// ─── EDIT / DELETE PERSON ────────────────────────────────────────────
+function openEditPerson(fbKey) {
+  normalizeTrainings();
+  const p = people.find(x => (x.fbKey||x.id) == fbKey);
+  if (!p) return;
+  document.getElementById('ep-id').value = p.fbKey || p.id;
+  document.getElementById('ep-name').value = p.name;
+  document.getElementById('ep-role').value = p.role;
+  document.getElementById('ep-dept').value = p.dept || '';
+  document.getElementById('ep-email').value = p.email || '';
+  document.getElementById('ep-phone').value = p.phone || '';
+  document.getElementById('ep-startdate').value = p.startDate || '';
+  document.getElementById('ep-note').value = p.note || '';
+  document.getElementById('ep-files').innerHTML = '';
+  document.getElementById('edit-person-title').textContent = '✏️ Upravit — ' + p.name;
+  const fields = document.getElementById('edit-person-training-fields');
+  fields.innerHTML = trainingTypes.map(t => `
+    <div class="form-group">
+      <label class="form-label">${t.icon} ${t.name}</label>
+      <input type="date" class="form-input" id="epf-${t.id}" value="${p.trainings[t.id] || ''}">
+    </div>`).join('');
+  openModal('modal-edit-person');
+}
+
+async function updatePerson() {
+  const fbKey = document.getElementById('ep-id').value;
+  const name  = document.getElementById('ep-name').value.trim();
+  const role  = document.getElementById('ep-role').value.trim();
+  if (!name||!role) { showNotif('Vyplňte jméno a pozici',true); return; }
+  const p = people.find(x=>(x.fbKey||x.id)==fbKey);
+  if (!p) return;
+  p.name = name; p.role = role;
+  p.dept  = document.getElementById('ep-dept').value.trim();
+  p.email = document.getElementById('ep-email').value.trim();
+  p.phone = document.getElementById('ep-phone').value.trim();
+  p.startDate = document.getElementById('ep-startdate').value;
+  p.note  = document.getElementById('ep-note').value.trim();
+  trainingTypes.forEach(t => { p.trainings[t.id] = document.getElementById('epf-'+t.id)?.value || null; });
+  try {
+    await set(ref(db, 'people/' + fbKey), p);
+    closeModal('modal-edit-person');
+    showNotif('✅ Změny uloženy — ' + name);
+  } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
+}
+
+async function deletePerson() {
+  const fbKey = document.getElementById('ep-id').value;
+  const p = people.find(x=>(x.fbKey||x.id)==fbKey);
+  if (!p) return;
+  if (!confirm(`Opravdu smazat osobu "${p.name}"? Tato akce je nevratná.`)) return;
+  try {
+    await remove(ref(db, 'people/' + fbKey));
+    closeModal('modal-edit-person');
+    showNotif('🗑 Osoba odstraněna');
+  } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
+}
+
+// ─── TYPE MANAGEMENT ─────────────────────────────────────────────────
+const ICONS = ['🦺','🏗️','📋','🔥','⚡','🚗','🏥','🔒','📐','🧯','🛡️','📝','🔧','🚧','🌡️','💊','🧪','📡'];
+const COLORS = ['#DA3633','#388BFD','#2EA043','#D29922','#E8500A','#8957E5','#F78166','#39D353','#58A6FF','#DB61A2'];
+let editingTypeId = null;
+
+function openAddType() {
+  editingTypeId = null;
+  document.getElementById('type-modal-title').textContent = 'Nový typ školení';
+  document.getElementById('ty-name').value = '';
+  document.getElementById('ty-desc').value = '';
+  document.getElementById('ty-icon').value = '📝';
+  document.getElementById('ty-color').value = '#E8500A';
+  buildIconRow(); buildColorRow();
+  openModal('modal-type');
+}
+
+function openEditType(typeId) {
+  editingTypeId = typeId;
+  const t = trainingTypes.find(x=>x.id===typeId);
+  if (!t) return;
+  document.getElementById('type-modal-title').textContent = 'Upravit typ školení';
+  document.getElementById('ty-name').value = t.name;
+  document.getElementById('ty-desc').value = t.desc||'';
+  document.getElementById('ty-icon').value = t.icon;
+  document.getElementById('ty-color').value = t.color;
+  buildIconRow(); buildColorRow();
+  openModal('modal-type');
+}
+
+function buildIconRow() {
+  const sel = document.getElementById('ty-icon').value;
+  document.getElementById('icon-row').innerHTML = ICONS.map(ic =>
+    `<div class="icon-opt ${ic===sel?'selected':''}" onclick="selectIcon('${ic}',this)">${ic}</div>`).join('');
+}
+function buildColorRow() {
+  const sel = document.getElementById('ty-color').value;
+  document.getElementById('color-row').innerHTML = COLORS.map(c =>
+    `<div class="color-dot ${c===sel?'selected':''}" style="background:${c}" onclick="selectColor('${c}',this)" title="${c}"></div>`).join('');
+}
+function selectIcon(ic, el) {
+  document.getElementById('ty-icon').value = ic;
+  document.querySelectorAll('.icon-opt').forEach(e=>e.classList.remove('selected'));
+  el.classList.add('selected');
+}
+function selectColor(c, el) {
+  document.getElementById('ty-color').value = c;
+  document.querySelectorAll('.color-dot').forEach(e=>e.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+async function saveType() {
+  const name = document.getElementById('ty-name').value.trim();
+  if (!name) { showNotif('Zadejte název školení',true); return; }
+  const icon  = document.getElementById('ty-icon').value || '📝';
+  const color = document.getElementById('ty-color').value || '#0073AB';
+  const desc  = document.getElementById('ty-desc').value.trim();
+  if (editingTypeId) {
+    const t = trainingTypes.find(x=>x.id===editingTypeId);
+    if (t) { t.name=name; t.icon=icon; t.color=color; t.desc=desc; }
+    showNotif('✅ Typ upraven');
+  } else {
+    const id = 'type_' + Date.now();
+    trainingTypes.push({ id, name, icon, color, desc });
+    showNotif('✅ Nový typ přidán: ' + name);
+  }
+  try {
+    await fbSaveTypes();
+    closeModal('modal-type');
+  } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
+}
+
+async function deleteType(typeId) {
+  if (trainingTypes.length <= 1) { showNotif('Musí zůstat alespoň jeden typ',true); return; }
+  const t = trainingTypes.find(x=>x.id===typeId);
+  if (!confirm(`Opravdu smazat typ "${t?.name}"?`)) return;
+  trainingTypes = trainingTypes.filter(x=>x.id!==typeId);
+  try {
+    await fbSaveTypes();
+    showNotif('🗑 Typ odstraněn');
+  } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
+}
+
+// ─── FILE UPLOAD ──────────────────────────────────────────────────────
+function handleFileUpload(event, listId) {
+  Array.from(event.target.files).forEach(f => {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.innerHTML = `<span>📄</span><span class="file-name">${f.name}</span><span class="file-size">${(f.size/1024).toFixed(0)} KB</span><button class="file-remove" onclick="this.parentElement.remove()">✕</button>`;
+    document.getElementById(listId).appendChild(item);
+  });
+}
+
+// ─── NOTIFICATION ─────────────────────────────────────────────────────
+function showNotif(msg, isError) {
+  const n = document.getElementById('notif');
+  n.textContent = msg;
+  n.style.background = isError ? 'var(--red)' : 'var(--green)';
+  n.classList.add('show');
+  setTimeout(()=>n.classList.remove('show'), 3000);
+}
+
+// ─── MODAL CLOSE ON BG + ESC ──────────────────────────────────────────
+document.querySelectorAll('.modal-bg').forEach(bg => {
+  bg.addEventListener('click', e => { if(e.target===bg) bg.classList.remove('open'); });
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-bg.open').forEach(bg => bg.classList.remove('open'));
+});
+
+// ─── MAKE FUNCTIONS GLOBAL (needed for onclick in HTML) ───────────────
+window.showPage        = showPage;
+window.showTypeDetail  = showTypeDetail;
+window.openAddPerson   = openAddPerson;
+window.openEditPerson  = openEditPerson;
+window.openAddTraining = openAddTraining;
+window.openEditTraining= openEditTraining;
+window.openAddType     = openAddType;
+window.openEditType    = openEditType;
+window.deleteType      = deleteType;
+window.deletePerson    = deletePerson;
+window.savePerson      = savePerson;
+window.saveTraining    = saveTraining;
+window.updatePerson    = updatePerson;
+window.saveType        = saveType;
+window.closeModal      = closeModal;
+window.selectIcon      = selectIcon;
+window.selectColor     = selectColor;
+window.handleFileUpload= handleFileUpload;
+window.filterPeople    = filterPeople;
+window.filterByStatus  = filterByStatus;
+
+// ─── INIT ─────────────────────────────────────────────────────────────
+document.getElementById('todayDate').textContent =
+  today.toLocaleDateString('cs-CZ',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+setLoading(true);
+startLiveSync();
+setTimeout(() => setLoading(false), 2500);
+</script>
+</body>
+</html>
