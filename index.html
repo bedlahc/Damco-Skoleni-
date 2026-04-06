@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Damco Jaroměř — Správa školení</title>
+<!-- Firebase compat CDN -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   /* ── MAERSK COLOUR PALETTE ── */
@@ -583,11 +586,9 @@
 
 <div class="notif" id="notif"></div>
 
-<!-- Firebase compat CDN — funguje bez import/module -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
 <script>
+window.addEventListener('load', function() {
+
 // ─── FIREBASE SETUP ───────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyCngZ7woRCjNJKJozrz3091FJQRMweINdY",
@@ -1198,9 +1199,34 @@ document.addEventListener('keydown', e => {
 document.getElementById('todayDate').textContent =
   today.toLocaleDateString('cs-CZ',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 
+// Zpřístupni všechny funkce globálně pro onclick atributy
+window.showPage         = showPage;
+window.showTypeDetail   = showTypeDetail;
+window.openAddPerson    = openAddPerson;
+window.openEditPerson   = openEditPerson;
+window.openAddTraining  = openAddTraining;
+window.openEditTraining = openEditTraining;
+window.openAddType      = openAddType;
+window.openEditType     = openEditType;
+window.deleteType       = deleteType;
+window.deletePerson     = deletePerson;
+window.savePerson       = savePerson;
+window.saveTraining     = saveTraining;
+window.updatePerson     = updatePerson;
+window.saveType         = saveType;
+window.openModal        = openModal;
+window.closeModal       = closeModal;
+window.selectIcon       = selectIcon;
+window.selectColor      = selectColor;
+window.handleFileUpload = handleFileUpload;
+window.filterPeople     = filterPeople;
+window.filterByStatus   = filterByStatus;
+
 setLoading(true);
 startLiveSync();
 setTimeout(() => setLoading(false), 2500);
+
+}); // end window.addEventListener('load')
 </script>
 </body>
 </html>
