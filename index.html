@@ -467,16 +467,30 @@
       <div><div class="page-title">Seznam osob</div><div class="page-subtitle">Všichni zaměstnanci a jejich školení</div></div>
       <button class="btn btn-primary" onclick="openAddPerson()">+ Přidat osobu</button>
     </div>
-    <div class="filter-bar">
-      <input type="text" class="search-input" placeholder="Hledat jméno nebo pozici…" oninput="filterPeople(this.value)">
-      <select class="filter-select" onchange="filterByStatus(this.value)">
-        <option value="">Všechny stavy</option>
-        <option value="ok">Platné</option>
-        <option value="expiring">Brzy expiruje</option>
-        <option value="expired">Prošlé</option>
-        <option value="missing">Chybí</option>
+
+    <!-- FILTER BAR -->
+    <div class="filter-bar" style="flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+      <input type="text" class="search-input" placeholder="🔍 Hledat jméno nebo pozici…" oninput="filterPeople(this.value)" style="min-width:180px;flex:1;">
+      <select class="filter-select" id="filter-type-select" onchange="filterByType(this.value)" style="min-width:160px;">
+        <option value="">Všechna školení</option>
       </select>
+      <select class="filter-select" id="filter-status-select" onchange="filterByStatus(this.value)" style="min-width:150px;">
+        <option value="">Všechny stavy</option>
+        <option value="ok">✅ Platné</option>
+        <option value="expiring">⏳ Brzy expiruje</option>
+        <option value="expired">❌ Prošlé</option>
+        <option value="missing">● Chybí</option>
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="clearPeopleFilters()" id="filter-clear-btn"
+        style="display:none;border-color:var(--primary);color:var(--primary);">✕ Zrušit filtry</button>
     </div>
+
+    <!-- ACTIVE FILTER CHIPS -->
+    <div id="filter-chips" style="display:none;margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap;"></div>
+
+    <!-- RESULT COUNT -->
+    <div id="filter-result-info" style="font-size:12px;color:var(--text-muted);margin-bottom:10px;"></div>
+
     <div class="table-wrap" style="overflow-x:auto;">
       <table><thead id="people-thead"><tr></tr></thead><tbody id="people-tbody"></tbody></table>
     </div>
@@ -503,7 +517,7 @@
       <div><div class="page-title" id="type-detail-title">Školení</div><div class="page-subtitle" id="type-detail-sub"></div></div>
     </div>
     <div class="table-wrap" style="overflow-x:auto;">
-      <table><thead><tr><th>Zaměstnanec</th><th>Absolvováno</th><th>Platnost do</th><th>Stav</th><th>Dokument</th></tr></thead>
+      <table><thead><tr><th>Zaměstnanec</th><th>Absolvováno</th><th>Platnost do</th><th>Stav</th><th>Dokument</th><th>Akce</th></tr></thead>
       <tbody id="type-detail-tbody"></tbody></table>
     </div>
   </div>
@@ -707,6 +721,13 @@
           <input type="text" class="form-input" id="t-cert" placeholder="např. BEZ-2025-001">
         </div>
 
+        <!-- VÝBĚR DOKUMENTU PRO DANÉ ŠKOLENÍ -->
+        <div class="form-group full" id="t-doc-picker-wrap" style="display:none;">
+          <label class="form-label">📎 Vybrat dokument školení</label>
+          <div id="t-doc-picker-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;max-height:200px;overflow-y:auto;"></div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Vyberte dokument ze kterého bylo školení provedeno — volitelné</div>
+        </div>
+
         <div class="form-group full">
           <label class="form-label">Přiřadit školení</label>
           <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
@@ -758,7 +779,7 @@
 
 <!-- ============= MODAL: ADD/EDIT TYPE ============= -->
 <div class="modal-bg" id="modal-type">
-  <div class="modal" style="max-width:480px;">
+  <div class="modal" style="max-width:500px;">
     <div class="modal-header">
       <div class="modal-title" id="type-modal-title">Nový typ školení</div>
       <button class="modal-close" onclick="closeModal('modal-type')">✕</button>
@@ -766,8 +787,8 @@
     <div class="modal-body">
       <div class="form-grid">
         <div class="form-group full">
-          <label class="form-label">Název školení *</label>
-          <input type="text" class="form-input" id="ty-name" placeholder="např. Požární ochrana">
+          <label class="form-label">Název *</label>
+          <input type="text" class="form-input" id="ty-name" placeholder="např. Požární ochrana, Zdravotní prohlídka…">
         </div>
         <div class="form-group full">
           <label class="form-label">Vyberte ikonu</label>
@@ -779,10 +800,61 @@
           <div class="color-row" id="color-row"></div>
           <input type="hidden" id="ty-color" value="#E8500A">
         </div>
+
+        <!-- PLATNOST -->
+        <div class="form-group full">
+          <label class="form-label">Platnost / Perioda opakování</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="number" class="form-input" id="ty-validity-num" min="1" max="120" value="1"
+              style="width:90px;flex-shrink:0;" oninput="updateValidityPreview()">
+            <select class="form-input" id="ty-validity-unit" style="flex:1;" onchange="updateValidityPreview()">
+              <option value="months">měsíců</option>
+              <option value="years" selected>let</option>
+            </select>
+          </div>
+          <!-- Quick picks -->
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+            <button type="button" onclick="setValidityQuick(6,'months')"
+              style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text-muted);font-size:11px;cursor:pointer;font-family:'Barlow',sans-serif;">
+              6 měs.
+            </button>
+            <button type="button" onclick="setValidityQuick(1,'years')"
+              style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text-muted);font-size:11px;cursor:pointer;font-family:'Barlow',sans-serif;">
+              1 rok
+            </button>
+            <button type="button" onclick="setValidityQuick(2,'years')"
+              style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text-muted);font-size:11px;cursor:pointer;font-family:'Barlow',sans-serif;">
+              2 roky
+            </button>
+            <button type="button" onclick="setValidityQuick(3,'years')"
+              style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text-muted);font-size:11px;cursor:pointer;font-family:'Barlow',sans-serif;">
+              3 roky
+            </button>
+            <button type="button" onclick="setValidityQuick(5,'years')"
+              style="padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text-muted);font-size:11px;cursor:pointer;font-family:'Barlow',sans-serif;">
+              5 let
+            </button>
+          </div>
+          <div id="ty-validity-preview" style="margin-top:8px;padding:8px 12px;background:var(--primary-light);border-radius:6px;font-size:12px;color:var(--primary);font-weight:600;"></div>
+        </div>
+
+        <!-- UPOZORNĚNÍ PŘEDEM -->
+        <div class="form-group full">
+          <label class="form-label">Upozornit předem</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="number" class="form-input" id="ty-warn-num" min="1" max="365" value="30"
+              style="width:90px;flex-shrink:0;">
+            <select class="form-input" id="ty-warn-unit" style="flex:1;">
+              <option value="days" selected>dní před expirací</option>
+              <option value="months">měsíců před expirací</option>
+            </select>
+          </div>
+          <div class="form-hint">Kdy se zobrazí upozornění na nadcházející expiraci</div>
+        </div>
+
         <div class="form-group full">
           <label class="form-label">Popis (volitelný)</label>
-          <input type="text" class="form-input" id="ty-desc" placeholder="Krátký popis školení">
-          <div class="form-hint">Platnost je vždy 1 rok od data absolvování.</div>
+          <input type="text" class="form-input" id="ty-desc" placeholder="Krátký popis">
         </div>
       </div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
@@ -917,7 +989,25 @@ var _filterText = '';
 var _filterStatus = '';
 var editingTypeId = null;
 
-var VALIDITY_YEARS = 1;
+var VALIDITY_YEARS = 1; // default fallback
+
+// Vrátí platnost v dnech pro daný typ
+function getValidityDays(type) {
+  if (!type) return 365;
+  var num  = parseInt(type.validityNum)  || 1;
+  var unit = type.validityUnit || 'years';
+  if (unit === 'months') return num * 30;
+  return num * 365;
+}
+
+// Vrátí počet dní upozornění pro daný typ
+function getWarnDays(type) {
+  if (!type) return 30;
+  var num  = parseInt(type.warnNum)  || 30;
+  var unit = type.warnUnit || 'days';
+  if (unit === 'months') return num * 30;
+  return num;
+}
 var today = new Date(); today.setHours(0,0,0,0);
 
 var DEFAULT_TYPES = [
@@ -936,16 +1026,30 @@ function addYears(dateStr, y) {
   d.setFullYear(d.getFullYear() + y);
   return d;
 }
+
+function addDays(dateStr, days) {
+  if (!dateStr) return null;
+  var d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function getExpiryDate(dateStr, type) {
+  if (!dateStr) return null;
+  return addDays(dateStr, getValidityDays(type));
+}
+
 function daysDiff(d) { return d ? Math.round((d - today) / 86400000) : null; }
 function fmtDate(s) { if (!s) return '—'; return new Date(s).toLocaleDateString('cs-CZ'); }
 function initials(n) { return n.split(' ').map(function(w){return w[0];}).join('').substring(0,2).toUpperCase(); }
 
-function getStatus(dateStr) {
+function getStatus(dateStr, type) {
   if (!dateStr) return 'missing';
-  var exp = addYears(dateStr, VALIDITY_YEARS);
+  var exp  = getExpiryDate(dateStr, type);
   var diff = daysDiff(exp);
+  var warn = getWarnDays(type);
   if (diff < 0) return 'expired';
-  if (diff <= 30) return 'expiring';
+  if (diff <= warn) return 'expiring';
   return 'ok';
 }
 
@@ -1075,16 +1179,23 @@ function showTypeDetail(typeId) {
   // Tabulka zaměstnanců
   var sorted = people.slice().sort(function(a,b){
     var order = {expired:0,expiring:1,missing:2,ok:3};
-    return (order[getStatus(a.trainings[typeId])]||0) - (order[getStatus(b.trainings[typeId])]||0);
+    return (order[getStatus(a.trainings[typeId], type)]||0) - (order[getStatus(b.trainings[typeId], type)]||0);
   });
   document.getElementById('type-detail-tbody').innerHTML = sorted.map(function(p) {
-    var s = getStatus(p.trainings[typeId]);
-    var exp = p.trainings[typeId] ? addYears(p.trainings[typeId], VALIDITY_YEARS) : null;
+    var s = getStatus(p.trainings[typeId], type);
+    var exp = getExpiryDate(p.trainings[typeId], type);
+    var docKey = p.trainingDocs && p.trainingDocs[typeId];
+    var docCell = '—';
+    if (docKey) {
+      var doc = _allDocs.find(function(d){ return d.fbKey===docKey; });
+      if (doc) docCell = '<button class="btn btn-ghost btn-sm" onclick="openDocUrl(\''+docKey+'\')" title="'+doc.name+'">📎 '+doc.name.substring(0,20)+(doc.name.length>20?'…':'')+'</button>';
+    }
     return '<tr><td><div class="person-cell"><div class="avatar">'+initials(p.name)+'</div><div><div class="person-name">'+p.name+'</div><div class="person-role">'+p.role+'</div></div></div></td>'
       +'<td>'+(p.trainings[typeId]?fmtDate(p.trainings[typeId]):'<span style="color:var(--text-muted)">—</span>')+'</td>'
       +'<td>'+(exp?exp.toLocaleDateString('cs-CZ'):'—')+'</td>'
       +'<td>'+statusBadge(s)+'</td>'
-      +'<td><button class="btn btn-ghost btn-sm" onclick="openEditTraining(\''+p.fbKey+'\',\''+typeId+'\')">📎 Aktualizovat</button></td></tr>';
+      +'<td>'+docCell+'</td>'
+      +'<td><button class="btn btn-ghost btn-sm" onclick="openEditTraining(\''+p.fbKey+'\',\''+typeId+'\')">✏️ Aktualizovat</button></td></tr>';
   }).join('');
 
   document.getElementById('page-type-detail').classList.add('active');
@@ -1095,27 +1206,34 @@ function renderTypeAttachments(typeId) {
   var old = document.getElementById('type-attachments-section');
   if (old) old.remove();
 
-  var typeDocs = _allDocs.filter(function(d){ return d.cat === 'training_'+typeId; });
+  var cat = 'training_'+typeId;
+  // Aktivní (ne archivované) dokumenty
+  var activeDocs = _allDocs.filter(function(d){ return d.cat===cat && !d.archived; });
+  // Archivované (starší verze)
+  var archivedDocs = _allDocs.filter(function(d){ return d.cat===cat && d.archived; });
+
   var section = document.createElement('div');
   section.id = 'type-attachments-section';
   section.style.marginTop = '24px';
 
-  var docsHtml;
-  if (!typeDocs.length) {
-    docsHtml = '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--card-radius);'
+  // ── Aktivní dokumenty ──────────────────────────────────
+  var activeHtml;
+  if (!activeDocs.length) {
+    activeHtml = '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--card-radius);'
       +'padding:24px;text-align:center;color:var(--text-muted);">'
       +'<div style="font-size:32px;margin-bottom:8px;">📂</div>'
       +'<div style="font-size:13px;">Žádné přílohy — klikněte na <strong>📎 Nahrát přílohu</strong> výše</div></div>';
   } else {
-    docsHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">'
-      + typeDocs.map(function(d) {
+    activeHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;">'
+      + activeDocs.map(function(d) {
           var date = d.createdAt ? new Date(d.createdAt).toLocaleDateString('cs-CZ') : '';
+          var ver  = d.version ? ' <span style="background:var(--primary);color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 7px;">v'+d.version+'</span>' : '';
           return '<div class="doc-card" onclick="openDocDetail(\''+d.fbKey+'\')">'
             +'<div style="display:flex;align-items:center;gap:10px;">'
               +'<span style="font-size:28px;">'+fileIcon(d.fileName)+'</span>'
               +'<div style="flex:1;min-width:0;">'
-                +'<div class="doc-card-name" style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+d.name+'</div>'
-                +'<div style="font-size:10px;color:var(--text-muted);">📅 '+date+'</div>'
+                +'<div class="doc-card-name" style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+d.name+ver+'</div>'
+                +'<div style="font-size:10px;color:var(--text-muted);">📅 '+date+' · '+Math.round((d.fileSize||0)/1024)+' KB</div>'
               +'</div>'
             +'</div>'
             +'<div class="doc-card-actions" onclick="event.stopPropagation()">'
@@ -1126,9 +1244,65 @@ function renderTypeAttachments(typeId) {
       +'</div>';
   }
 
-  section.innerHTML = '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:700;'
-    +'color:var(--primary);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">📎 Přílohy a dokumenty ('+typeDocs.length+')</div>'
-    + docsHtml;
+  // ── Historie verzí ─────────────────────────────────────
+  var histHtml = '';
+  if (archivedDocs.length) {
+    // Seskup podle názvu dokumentu
+    var byName = {};
+    archivedDocs.forEach(function(d) {
+      if (!byName[d.name]) byName[d.name] = [];
+      byName[d.name].push(d);
+    });
+    // Seřaď každou skupinu od nejnovější
+    Object.keys(byName).forEach(function(n){
+      byName[n].sort(function(a,b){ return (b.version||1)-(a.version||1); });
+    });
+
+    var rows = [];
+    Object.keys(byName).forEach(function(docName) {
+      byName[docName].forEach(function(d) {
+        var date  = d.createdAt  ? new Date(d.createdAt).toLocaleDateString('cs-CZ')  : '—';
+        var arcDate = d.archivedAt ? new Date(d.archivedAt).toLocaleDateString('cs-CZ') : '—';
+        rows.push('<tr>'
+          +'<td>'+fileIcon(d.fileName)+' <strong>'+d.name+'</strong></td>'
+          +'<td style="text-align:center;">'
+            +'<span style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;font-size:11px;font-weight:700;padding:2px 9px;">v'+(d.version||1)+'</span>'
+          +'</td>'
+          +'<td>'+date+'</td>'
+          +'<td>'+arcDate+'</td>'
+          +'<td>'+Math.round((d.fileSize||0)/1024)+' KB</td>'
+          +'<td style="white-space:nowrap;">'
+            +'<button class="btn btn-ghost btn-sm" onclick="openDocUrl(\''+d.fbKey+'\')" style="margin-right:4px;">👁</button>'
+            +'<button class="btn btn-primary btn-sm" onclick="restoreDocVersion(\''+d.fbKey+'\')" title="Obnovit tuto verzi jako aktuální">🔄 Obnovit</button>'
+          +'</td>'
+          +'</tr>');
+      });
+    });
+
+    histHtml = '<div style="margin-top:20px;">'
+      +'<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:15px;font-weight:700;'
+        +'color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🕓 Historie verzí ('+archivedDocs.length+')</div>'
+      +'<div class="table-wrap"><table style="width:100%;border-collapse:collapse;">'
+        +'<thead style="background:var(--bg3);"><tr>'
+          +'<th style="padding:9px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);text-align:left;">Dokument</th>'
+          +'<th style="padding:9px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);text-align:center;">Verze</th>'
+          +'<th style="padding:9px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);">Nahráno</th>'
+          +'<th style="padding:9px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);">Archivováno</th>'
+          +'<th style="padding:9px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);">Velikost</th>'
+          +'<th style="padding:9px 14px;font-family:\'Barlow Condensed\',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);">Akce</th>'
+        +'</tr></thead>'
+        +'<tbody style="font-size:13px;">'+rows.join('')+'</tbody>'
+      +'</table></div>'
+      +'</div>';
+  }
+
+  section.innerHTML =
+    '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:16px;font-weight:700;'
+      +'color:var(--primary);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">'
+      +'📎 Přílohy a dokumenty ('+activeDocs.length+')</div>'
+    + activeHtml
+    + histHtml;
+
   document.getElementById('page-type-detail').appendChild(section);
 }
 
@@ -1147,12 +1321,12 @@ function renderDashboard() {
   var okN=0, expN=0, overN=0, rows=[];
   people.forEach(function(p) {
     trainingTypes.forEach(function(type) {
-      var s = getStatus(p.trainings[type.id]);
+      var s = getStatus(p.trainings[type.id], type);
       if (s==='ok') okN++;
       else if (s==='expiring') expN++;
       else if (s==='expired') overN++;
       if (s!=='ok' && s!=='missing') {
-        var exp = addYears(p.trainings[type.id], VALIDITY_YEARS);
+        var exp = getExpiryDate(p.trainings[type.id], type);
         rows.push({p:p, type:type, s:s, exp:exp, diff:daysDiff(exp)});
       }
     });
@@ -1181,10 +1355,10 @@ function renderDashboard() {
   var items = [];
   people.forEach(function(p) {
     trainingTypes.forEach(function(type) {
-      var s = getStatus(p.trainings[type.id]);
+      var s = getStatus(p.trainings[type.id], type);
       if (s==='expired') items.push('<div class="alert-chip">❌ '+p.name+' – '+type.name+'</div>');
       else if (s==='expiring') {
-        var diff = daysDiff(addYears(p.trainings[type.id], VALIDITY_YEARS));
+        var diff = daysDiff(getExpiryDate(p.trainings[type.id], type));
         items.push('<div class="alert-chip soon">⏳ '+p.name+' – '+type.name+' ('+diff+'d)</div>');
       }
     });
@@ -1197,41 +1371,138 @@ function renderDashboard() {
 }
 
 // ─── PEOPLE TABLE ────────────────────────────────────────
+var _filterText   = '';
+var _filterStatus = '';
+var _filterType   = '';
+
+function buildTypeFilterSelect() {
+  var sel = document.getElementById('filter-type-select');
+  if (!sel) return;
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">Všechna školení</option>'
+    + trainingTypes.map(function(t){
+        return '<option value="'+t.id+'">'+t.icon+' '+t.name+'</option>';
+      }).join('');
+  if (cur) sel.value = cur;
+}
+
+function filterPeople(v) { _filterText = v.toLowerCase(); renderPeople(); updateFilterUI(); }
+function filterByStatus(v) { _filterStatus = v; renderPeople(); updateFilterUI(); }
+function filterByType(v) { _filterType = v; renderPeople(); updateFilterUI(); }
+
+function clearPeopleFilters() {
+  _filterText = ''; _filterStatus = ''; _filterType = '';
+  var inp = document.querySelector('#page-people .search-input');
+  if (inp) inp.value = '';
+  var ts = document.getElementById('filter-type-select'); if (ts) ts.value = '';
+  var ss = document.getElementById('filter-status-select'); if (ss) ss.value = '';
+  renderPeople(); updateFilterUI();
+}
+
+function updateFilterUI() {
+  var hasF = _filterText || _filterStatus || _filterType;
+  var cb = document.getElementById('filter-clear-btn');
+  if (cb) cb.style.display = hasF ? '' : 'none';
+
+  var chips = [];
+  if (_filterType) {
+    var t = trainingTypes.find(function(x){ return x.id===_filterType; });
+    if (t) chips.push('<span style="background:var(--primary-light);border:1px solid var(--primary);border-radius:20px;padding:3px 12px;font-size:12px;font-weight:600;color:var(--primary);">'
+      +t.icon+' '+t.name
+      +' <span onclick="filterByType(\'\');var s=document.getElementById(\'filter-type-select\');if(s)s.value=\'\';" style="cursor:pointer;margin-left:4px;opacity:0.6;">✕</span></span>');
+  }
+  if (_filterStatus) {
+    var sLabel = {ok:'✅ Platné',expiring:'⏳ Brzy expiruje',expired:'❌ Prošlé',missing:'● Chybí'}[_filterStatus]||_filterStatus;
+    chips.push('<span style="background:var(--primary-light);border:1px solid var(--primary);border-radius:20px;padding:3px 12px;font-size:12px;font-weight:600;color:var(--primary);">'
+      +sLabel
+      +' <span onclick="filterByStatus(\'\');var s=document.getElementById(\'filter-status-select\');if(s)s.value=\'\';" style="cursor:pointer;margin-left:4px;opacity:0.6;">✕</span></span>');
+  }
+  if (_filterText) {
+    chips.push('<span style="background:var(--primary-light);border:1px solid var(--primary);border-radius:20px;padding:3px 12px;font-size:12px;font-weight:600;color:var(--primary);">'
+      +'🔍 "'+_filterText+'"'
+      +' <span onclick="filterPeople(\'\');var i=document.querySelector(\'#page-people .search-input\');if(i)i.value=\'\';" style="cursor:pointer;margin-left:4px;opacity:0.6;">✕</span></span>');
+  }
+  var ce = document.getElementById('filter-chips');
+  if (ce) { ce.innerHTML = chips.join(''); ce.style.display = chips.length ? 'flex' : 'none'; }
+}
+
 function renderPeople() {
   normalizeTrainings();
+  buildTypeFilterSelect();
+
   var list = people.slice();
-  if (_filterText) list = list.filter(function(p){ return p.name.toLowerCase().indexOf(_filterText)>-1 || p.role.toLowerCase().indexOf(_filterText)>-1; });
-  if (_filterStatus) list = list.filter(function(p){ return trainingTypes.some(function(t){ return getStatus(p.trainings[t.id])===_filterStatus; }); });
+
+  // Textový filtr
+  if (_filterText) list = list.filter(function(p){
+    return (p.name||'').toLowerCase().indexOf(_filterText)>-1
+        || (p.role||'').toLowerCase().indexOf(_filterText)>-1
+        || (p.dept||'').toLowerCase().indexOf(_filterText)>-1;
+  });
+
+  // Kombinovaný filtr: typ + stav
+  if (_filterType && _filterStatus) {
+    var ft = trainingTypes.find(function(x){ return x.id===_filterType; });
+    list = list.filter(function(p){ return getStatus(p.trainings[_filterType], ft)===_filterStatus; });
+  } else if (_filterType) {
+    // Pouze typ — bez dalšího filtrování řádků, jen zvýraznění
+  } else if (_filterStatus) {
+    list = list.filter(function(p){
+      return trainingTypes.some(function(t){ return getStatus(p.trainings[t.id], t)===_filterStatus; });
+    });
+  }
+
+  // Výsledkový počet
+  var ie = document.getElementById('filter-result-info');
+  if (ie) ie.textContent = (_filterText||_filterStatus||_filterType) ? 'Zobrazeno: '+list.length+' z '+people.length+' zaměstnanců' : '';
 
   var segMap = {ok:'done',expiring:'warn',expired:'overdue',missing:'miss'};
 
+  // Záhlaví — zvýrazni filtrovaný sloupec
   document.getElementById('people-thead').innerHTML = '<tr><th>Zaměstnanec</th>'
-    + trainingTypes.map(function(t){ return '<th>'+t.icon+' '+t.name+'</th>'; }).join('')
+    + trainingTypes.map(function(t){
+        var hl = (_filterType===t.id) ? ' style="background:rgba(0,115,171,0.25);color:#fff;"' : '';
+        return '<th'+hl+'>'+t.icon+' '+t.name+'</th>';
+      }).join('')
     + '<th>Průběh</th><th>Akce</th></tr>';
 
-  document.getElementById('people-tbody').innerHTML = list.map(function(p) {
+  document.getElementById('people-tbody').innerHTML = (list.length ? list : []).map(function(p) {
     var cols = trainingTypes.map(function(t) {
-      var s = getStatus(p.trainings[t.id]);
-      return '<td>'+statusBadge(s)+'<div style="font-size:10px;color:var(--text-muted);margin-top:3px;">'+(p.trainings[t.id]?fmtDate(p.trainings[t.id]):'Chybí')+'</div></td>';
+      var s = getStatus(p.trainings[t.id], t);
+      var docKey = p.trainingDocs && p.trainingDocs[t.id];
+      var docLink = '';
+      if (docKey) {
+        var doc = _allDocs.find(function(d){ return d.fbKey===docKey; });
+        if (doc) docLink = ' <span onclick="openDocUrl(\''+docKey+'\')" title="'+doc.name+'" style="cursor:pointer;color:var(--primary);font-size:11px;">📎</span>';
+      }
+      // Zvýrazni buňku filtrovaného typu
+      var isFiltered = _filterType === t.id;
+      var matchesBoth = isFiltered && _filterStatus && s === _filterStatus;
+      var cellStyle = matchesBoth
+        ? ' style="background:rgba(0,115,171,0.08);border-left:3px solid var(--primary);"'
+        : isFiltered ? ' style="background:rgba(0,115,171,0.04);"' : '';
+      return '<td'+cellStyle+'>'+statusBadge(s)
+        +'<div style="font-size:10px;color:var(--text-muted);margin-top:3px;">'
+        +(p.trainings[t.id]?fmtDate(p.trainings[t.id]):'Chybí')
+        +docLink+'</div></td>';
     }).join('');
     var segs = trainingTypes.map(function(t){
-      var s = getStatus(p.trainings[t.id]);
-      return '<div class="prog-seg '+(segMap[s]||'miss')+'" title="'+t.name+'"></div>';
+      return '<div class="prog-seg '+(segMap[getStatus(p.trainings[t.id],t)]||'miss')+'" title="'+t.name+'"></div>';
     }).join('');
-    return '<tr><td><div class="person-cell"><div class="avatar">'+initials(p.name)+'</div>'
-      +'<div><div class="person-name">'+p.name+'</div><div class="person-role">'+p.role+' · '+p.dept+'</div></div></div></td>'
+    return '<tr>'
+      +'<td><div class="person-cell"><div class="avatar">'+initials(p.name)+'</div>'
+        +'<div><div class="person-name">'+p.name+'</div>'
+        +'<div class="person-role">'+(p.role||'')+(p.dept?' · '+p.dept:'')+'</div></div></div></td>'
       +cols
       +'<td><div class="prog-wrap">'+segs+'</div></td>'
       +'<td style="white-space:nowrap;">'
-      +'<button class="btn btn-ghost btn-sm" onclick="openEditPerson(\''+p.fbKey+'\')" style="margin-right:4px;">✏️ Upravit</button>'
-      +'<button class="btn btn-ghost btn-sm" onclick="openEditTraining(\''+p.fbKey+'\')" style="margin-right:4px;">➕ Školení</button>'
-      +'<button class="btn btn-ghost btn-sm" onclick="printCard(\''+p.fbKey+'\')" style="color:var(--primary);border-color:var(--primary);">🖨️ Tisk</button>'
+        +'<button class="btn btn-ghost btn-sm" onclick="openEditPerson(\''+p.fbKey+'\')" style="margin-right:4px;">✏️ Upravit</button>'
+        +'<button class="btn btn-ghost btn-sm" onclick="openEditTraining(\''+p.fbKey+'\')" style="margin-right:4px;">➕ Školení</button>'
+        +'<button class="btn btn-ghost btn-sm" onclick="printCard(\''+p.fbKey+'\')" style="color:var(--primary);border-color:var(--primary);">🖨️ Tisk</button>'
       +'</td></tr>';
-  }).join('');
+  }).join('')
+  || '<tr><td colspan="'+(trainingTypes.length+3)+'" style="text-align:center;padding:32px;color:var(--text-muted);">Žádní zaměstnanci neodpovídají filtru</td></tr>';
 }
 
-function filterPeople(v) { _filterText = v.toLowerCase(); renderPeople(); }
-function filterByStatus(v) { _filterStatus = v; renderPeople(); }
 
 // ─── UPCOMING ────────────────────────────────────────────
 function renderUpcoming() {
@@ -1239,8 +1510,8 @@ function renderUpcoming() {
   var expired=[], expiring=[];
   people.forEach(function(p) {
     trainingTypes.forEach(function(type) {
-      var s = getStatus(p.trainings[type.id]);
-      var exp = p.trainings[type.id] ? addYears(p.trainings[type.id], VALIDITY_YEARS) : null;
+      var s = getStatus(p.trainings[type.id], type);
+      var exp = p.trainings[type.id] ? getExpiryDate(p.trainings[type.id], type) : null;
       var diff = daysDiff(exp);
       if (s==='expired') expired.push({p:p,type:type,diff:diff,exp:exp});
       else if (s==='expiring') expiring.push({p:p,type:type,diff:diff,exp:exp});
@@ -1265,9 +1536,15 @@ function renderUpcoming() {
   renderList(expiring,'expiring-list');
 }
 
-// ─── TYPES PAGE ──────────────────────────────────────────
 function getTypeDocCount(typeId) {
   return _allDocs.filter(function(d){ return d.cat === 'training_'+typeId; }).length;
+}
+
+function validityLabel(t) {
+  var num  = t.validityNum  || 1;
+  var unit = t.validityUnit || 'years';
+  var unitLabel = unit==='months' ? (num===1?'měsíc':num<5?'měsíce':'měsíců') : (num===1?'rok':num<5?'roky':'let');
+  return num+' '+unitLabel;
 }
 
 function renderTypesPage() {
@@ -1278,7 +1555,9 @@ function renderTypesPage() {
       +'<div class="type-card-icon">'+t.icon+'</div>'
       +'<div class="type-card-info">'
         +'<div class="type-card-name">'+t.name+'</div>'
-        +'<div class="type-card-validity">'+(t.desc||'')+' · Platnost 1 rok</div>'
+        +'<div class="type-card-validity">⏱ Platnost: <strong>'+validityLabel(t)+'</strong>'
+          +' · 🔔 Upozornění: <strong>'+(t.warnNum||30)+' '+(t.warnUnit==='months'?'měs.':'dní')+'</strong></div>'
+        +(t.desc ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'+t.desc+'</div>' : '')
         +(docCount>0 ? '<div style="font-size:11px;color:var(--primary);margin-top:3px;">📎 '+docCount+' příloh</div>' : '')
       +'</div>'
       +'<div class="type-card-actions">'
@@ -1469,9 +1748,14 @@ function selectAllPeople(val) {
 
 function openAddTraining() {
   _trainingMode = 'all';
-  document.getElementById('t-type').innerHTML = trainingTypes.map(function(t){
+  var typeEl = document.getElementById('t-type');
+  typeEl.innerHTML = trainingTypes.map(function(t){
     return '<option value="'+t.id+'">'+t.icon+' '+t.name+'</option>';
   }).join('');
+
+  // Při změně typu zobraz dostupné dokumenty
+  typeEl.onchange = function(){ updateDocPicker(this.value); };
+
   ['t-date','t-instructor','t-cert','t-note'].forEach(function(id){
     var el = document.getElementById(id); if(el) el.value = '';
   });
@@ -1481,7 +1765,70 @@ function openAddTraining() {
   _setModeBtn('all');
   document.getElementById('t-selected-count').textContent =
     'Bude aplikováno na všechny ('+people.length+') zaměstnance';
+
+  // Zobraz dokumenty pro první typ v seznamu
+  updateDocPicker(typeEl.value);
+
   openModal('modal-training');
+}
+
+// Aktualizuje picker dokumentů podle vybraného typu školení
+function updateDocPicker(typeId) {
+  var wrap = document.getElementById('t-doc-picker-wrap');
+  var list = document.getElementById('t-doc-picker-list');
+  if (!wrap || !list) return;
+
+  // Dokumenty přiřazené tomuto typu
+  var typeDocs = _allDocs.filter(function(d){
+    return d.cat === 'training_'+typeId && !d.archived;
+  });
+
+  if (!typeDocs.length) {
+    wrap.style.display = 'none';
+    return;
+  }
+
+  wrap.style.display = '';
+
+  list.innerHTML = typeDocs.map(function(d) {
+    return '<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;'
+      +'background:var(--bg2);border:2px solid var(--border);border-radius:7px;cursor:pointer;'
+      +'transition:border-color 0.15s;" class="doc-pick-item">'
+      +'<input type="radio" name="t-doc-pick" value="'+d.fbKey+'"'
+      +' style="accent-color:var(--primary);cursor:pointer;flex-shrink:0;"'
+      +' onchange="onDocPickChange(this)">'
+      +'<span style="font-size:20px;">'+fileIcon(d.fileName)+'</span>'
+      +'<div style="min-width:0;">'
+        +'<div style="font-weight:600;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+d.name+'</div>'
+        +'<div style="font-size:10px;color:var(--text-muted);">'+d.fileName+'</div>'
+      +'</div>'
+      +'<button type="button" onclick="event.preventDefault();openDocUrl(\''+d.fbKey+'\')" '
+        +'style="margin-left:auto;flex-shrink:0;background:none;border:none;cursor:pointer;color:var(--primary);font-size:16px;" title="Otevřít">👁</button>'
+      +'</label>';
+  }).join('');
+
+  // Přidej možnost "Žádný dokument"
+  list.innerHTML = '<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;'
+    +'background:var(--bg2);border:2px solid var(--primary);border-radius:7px;cursor:pointer;" class="doc-pick-item">'
+    +'<input type="radio" name="t-doc-pick" value="" checked style="accent-color:var(--primary);cursor:pointer;flex-shrink:0;"'
+    +' onchange="onDocPickChange(this)">'
+    +'<span style="font-size:18px;">➖</span>'
+    +'<div style="font-weight:600;font-size:12px;color:var(--text-muted);">Bez konkrétního dokumentu</div>'
+    +'</label>'
+    + list.innerHTML;
+}
+
+function onDocPickChange(radio) {
+  // Vizuálně označ vybraný
+  document.querySelectorAll('.doc-pick-item').forEach(function(el){
+    el.style.borderColor = 'var(--border)';
+  });
+  radio.closest('label').style.borderColor = 'var(--primary)';
+}
+
+function getSelectedDocKey() {
+  var sel = document.querySelector('input[name="t-doc-pick"]:checked');
+  return sel ? sel.value : '';
 }
 
 function openEditTraining(fbKey, preselect) {
@@ -1539,10 +1886,21 @@ function saveTraining() {
     if (!hasAny) { showNotif('Zadejte alespoň jedno datum', true); return; }
   }
 
+  var selectedDocKey = getSelectedDocKey();
+
   db.ref().update(updates).then(function(){
+    // Pokud byl vybrán dokument, ulož referenci ke každé osobě zvlášť
+    if (selectedDocKey) {
+      var docUpdates = {};
+      targets.forEach(function(p) {
+        docUpdates['people/'+p.fbKey+'/trainingDocs/'+type] = selectedDocKey;
+      });
+      db.ref().update(docUpdates);
+    }
     closeModal('modal-training');
     var typeName = (trainingTypes.find(function(t){return t.id===type;})||{}).name || type;
-    showNotif('✅ Školení uloženo pro '+count+' zaměstnanců ('+typeName+')');
+    var docInfo = selectedDocKey ? ' 📎 s dokumentem' : '';
+    showNotif('✅ Školení uloženo pro '+count+' zaměstnanců ('+typeName+')'+docInfo);
   }).catch(function(e){ showNotif('❌ Chyba: '+e.message, true); });
 }
 
@@ -1554,6 +1912,11 @@ function openAddType() {
   document.getElementById('ty-desc').value='';
   document.getElementById('ty-icon').value='📝';
   document.getElementById('ty-color').value='#0073AB';
+  document.getElementById('ty-validity-num').value='1';
+  document.getElementById('ty-validity-unit').value='years';
+  document.getElementById('ty-warn-num').value='30';
+  document.getElementById('ty-warn-unit').value='days';
+  updateValidityPreview();
   buildIconRow(); buildColorRow();
   openModal('modal-type');
 }
@@ -1567,6 +1930,11 @@ function openEditType(typeId) {
   document.getElementById('ty-desc').value = t.desc||'';
   document.getElementById('ty-icon').value = t.icon;
   document.getElementById('ty-color').value = t.color;
+  document.getElementById('ty-validity-num').value = t.validityNum || 1;
+  document.getElementById('ty-validity-unit').value = t.validityUnit || 'years';
+  document.getElementById('ty-warn-num').value = t.warnNum || 30;
+  document.getElementById('ty-warn-unit').value = t.warnUnit || 'days';
+  updateValidityPreview();
   buildIconRow(); buildColorRow();
   openModal('modal-type');
 }
@@ -1597,18 +1965,43 @@ function selectColor(c, el) {
   el.classList.add('selected');
 }
 
+function updateValidityPreview() {
+  var num  = parseInt(document.getElementById('ty-validity-num').value) || 1;
+  var unit = document.getElementById('ty-validity-unit').value;
+  var wnum = parseInt(document.getElementById('ty-warn-num').value) || 30;
+  var wunit= document.getElementById('ty-warn-unit').value;
+  var unitLabel = unit==='months' ? (num===1?'měsíc':num<5?'měsíce':'měsíců') : (num===1?'rok':num<5?'roky':'let');
+  var wLabel = wunit==='months' ? 'měs.' : 'dní';
+  var prev = document.getElementById('ty-validity-preview');
+  if (prev) prev.textContent = '⏱ Platnost: '+num+' '+unitLabel+' · 🔔 Upozornění: '+wnum+' '+wLabel+' před expirací';
+}
+
+function setValidityQuick(num, unit) {
+  document.getElementById('ty-validity-num').value = num;
+  document.getElementById('ty-validity-unit').value = unit;
+  updateValidityPreview();
+}
+
 function saveType() {
   var name = document.getElementById('ty-name').value.trim();
-  if (!name) { showNotif('Zadejte název školení',true); return; }
-  var icon  = document.getElementById('ty-icon').value || '📝';
-  var color = document.getElementById('ty-color').value || '#0073AB';
-  var desc  = document.getElementById('ty-desc').value.trim();
+  if (!name) { showNotif('Zadejte název',true); return; }
+  var icon        = document.getElementById('ty-icon').value || '📝';
+  var color       = document.getElementById('ty-color').value || '#0073AB';
+  var desc        = document.getElementById('ty-desc').value.trim();
+  var validityNum = parseInt(document.getElementById('ty-validity-num').value) || 1;
+  var validityUnit= document.getElementById('ty-validity-unit').value || 'years';
+  var warnNum     = parseInt(document.getElementById('ty-warn-num').value) || 30;
+  var warnUnit    = document.getElementById('ty-warn-unit').value || 'days';
+
   if (editingTypeId) {
     var t = trainingTypes.find(function(x){ return x.id===editingTypeId; });
-    if (t) { t.name=name; t.icon=icon; t.color=color; t.desc=desc; }
+    if (t) { t.name=name; t.icon=icon; t.color=color; t.desc=desc;
+             t.validityNum=validityNum; t.validityUnit=validityUnit;
+             t.warnNum=warnNum; t.warnUnit=warnUnit; }
     showNotif('✅ Typ upraven');
   } else {
-    trainingTypes.push({ id:'type_'+Date.now(), name:name, icon:icon, color:color, desc:desc });
+    trainingTypes.push({ id:'type_'+Date.now(), name:name, icon:icon, color:color, desc:desc,
+      validityNum:validityNum, validityUnit:validityUnit, warnNum:warnNum, warnUnit:warnUnit });
     showNotif('✅ Nový typ přidán: '+name);
   }
   db.ref('trainingTypes').set(trainingTypes).then(function(){
@@ -1733,7 +2126,7 @@ function renderDocs() {
   buildDocCatSelect('doc-cat-filter', true);
   if (_docFilterCat) document.getElementById('doc-cat-filter').value = _docFilterCat;
 
-  var list = _allDocs.slice();
+  var list = _allDocs.filter(function(d){ return !d.archived; });
   if (_docFilterText) list = list.filter(function(d){
     return (d.name||'').toLowerCase().indexOf(_docFilterText)>-1
         || (d.desc||'').toLowerCase().indexOf(_docFilterText)>-1;
@@ -1758,9 +2151,10 @@ function renderDocs() {
       if (p) personName = '👤 '+p.name;
     }
     var date = d.createdAt ? new Date(d.createdAt).toLocaleDateString('cs-CZ') : '';
+    var verBadge = (d.version && d.version > 1) ? ' <span style="background:var(--primary);color:#fff;border-radius:10px;font-size:10px;font-weight:700;padding:1px 6px;">v'+d.version+'</span>' : '';
     return '<div class="doc-card" onclick="openDocDetail(\''+d.fbKey+'\')">'
       +'<div class="doc-card-icon">'+fileIcon(d.fileName)+'</div>'
-      +'<div class="doc-card-name">'+d.name+'</div>'
+      +'<div class="doc-card-name">'+d.name+verBadge+'</div>'
       +'<div><span class="doc-card-cat">'+cat.icon+' '+cat.label+'</span></div>'
       +'<div class="doc-card-meta">'
         +(personName ? '<span>'+personName+'</span>' : '')
@@ -1853,15 +2247,72 @@ function uploadDocument() {
           fileName: file.name, fileSize: file.size,
           storagePath: path, url: url,
           personFbKey: personKey || null,
-          createdAt: Date.now()
+          createdAt: Date.now(),
+          version: 1
         };
+
+        // Verzování pro VŠECHNY kategorie — ne jen training_
+        var prevDocs = _allDocs.filter(function(d){
+          return d.cat === cat && d.name === name && !d.archived;
+        });
+        var maxVer = 0;
+        prevDocs.forEach(function(d){ if ((d.version||1) > maxVer) maxVer = d.version||1; });
+        if (maxVer > 0) docData.version = maxVer + 1;
+
+        // Přesun předchozích aktivních verzí do archivu
+        var archUpdates = {};
+        prevDocs.forEach(function(d){
+          archUpdates['documents/'+d.fbKey+'/archived'] = true;
+          archUpdates['documents/'+d.fbKey+'/archivedAt'] = Date.now();
+        });
+        if (Object.keys(archUpdates).length) {
+          db.ref().update(archUpdates);
+        }
+
         db.ref('documents').push(docData).then(function() {
           closeModal('modal-upload-doc');
-          showNotif('✅ Dokument nahrán: '+name);
+          showNotif('✅ Dokument nahrán: '+name+(docData.version>1?' (v'+docData.version+')':''));
         });
       });
     }
   );
+}
+
+function restoreDocVersion(fbKey) {
+  var d = _allDocs.find(function(x){ return x.fbKey===fbKey; });
+  if (!d) return;
+  if (!confirm('Obnovit verzi v'+( d.version||1)+' dokumentu "'+d.name+'" jako aktuální?\n\nAktuální verze bude přesunuta do archivu.')) return;
+
+  var cat = d.cat;
+  // Archivuj aktuální aktivní verze stejného názvu
+  var archUpdates = {};
+  _allDocs.forEach(function(x) {
+    if (x.cat===cat && x.name===d.name && !x.archived && x.fbKey!==fbKey) {
+      archUpdates['documents/'+x.fbKey+'/archived'] = true;
+      archUpdates['documents/'+x.fbKey+'/archivedAt'] = Date.now();
+    }
+  });
+  // Aktivuj obnovovaný dokument
+  archUpdates['documents/'+fbKey+'/archived'] = false;
+  archUpdates['documents/'+fbKey+'/archivedAt'] = null;
+  archUpdates['documents/'+fbKey+'/restoredAt'] = Date.now();
+
+  db.ref().update(archUpdates).then(function(){
+    showNotif('🔄 Verze v'+(d.version||1)+' obnovena jako aktuální');
+  }).catch(function(e){ showNotif('❌ Chyba: '+e.message, true); });
+}
+// Otevře upload modal předvyplněný pro nahrání nové verze
+function openUploadNewVersion(fbKey) {
+  var d = _allDocs.find(function(x){ return x.fbKey===fbKey; });
+  if (!d) return;
+  closeModal('modal-doc-detail');
+  openUploadDoc();
+  setTimeout(function(){
+    document.getElementById('doc-name').value = d.name;
+    document.getElementById('doc-cat').value  = d.cat;
+    document.getElementById('doc-desc').value = d.desc||'';
+    if (d.personFbKey) document.getElementById('doc-person').value = d.personFbKey;
+  }, 50);
 }
 
 function openDocUrl(fbKey) {
@@ -1872,31 +2323,238 @@ function openDocUrl(fbKey) {
 function openDocDetail(fbKey) {
   var d = _allDocs.find(function(x){ return x.fbKey===fbKey; });
   if (!d) return;
-  var cat = getDocCatInfo(d.cat);
+  var catInfo = getDocCatInfo(d.cat);
   var personName = '';
-  if (d.personFbKey) {
+  if (d.assignedTo === 'all') {
+    personName = 'Všichni zaměstnanci ('+people.length+')';
+  } else if (d.assignedTo && typeof d.assignedTo === 'object') {
+    var assigned = Object.keys(d.assignedTo).map(function(k){
+      var p = people.find(function(x){ return x.fbKey===k; });
+      return p ? p.name : null;
+    }).filter(Boolean);
+    if (assigned.length) personName = assigned.join(', ');
+  } else if (d.personFbKey) {
     var p = people.find(function(x){ return x.fbKey===d.personFbKey; });
     if (p) personName = p.name+' ('+p.role+')';
   }
+
+  // Verze tohoto dokumentu (stejný název, stejná kategorie)
+  var allVersions = _allDocs.filter(function(x){
+    return x.cat===d.cat && x.name===d.name;
+  }).sort(function(a,b){ return (b.version||1)-(a.version||1); });
+
+  var verBadge = d.version ? ' <span style="background:var(--primary);color:#fff;border-radius:10px;font-size:11px;font-weight:700;padding:2px 8px;vertical-align:middle;">v'+d.version+'</span>' : '';
+
+  // Historie verzí (archivované)
+  var archivedVersions = allVersions.filter(function(x){ return x.archived && x.fbKey !== fbKey; });
+  var histHtml = '';
+  if (archivedVersions.length) {
+    histHtml = '<div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🕓 Historie verzí</div>'
+      +'<div style="display:flex;flex-direction:column;gap:8px;">'
+      + archivedVersions.map(function(v) {
+          var vdate = v.createdAt ? new Date(v.createdAt).toLocaleDateString('cs-CZ') : '—';
+          return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;'
+            +'background:var(--bg3);border:1px solid var(--border);border-radius:7px;">'
+            +'<span style="font-size:18px;">'+fileIcon(v.fileName)+'</span>'
+            +'<div style="flex:1;">'
+              +'<div style="font-size:12px;font-weight:600;color:var(--text);">'
+                +'v'+(v.version||1)+' &nbsp;·&nbsp; '+vdate
+                +' &nbsp;·&nbsp; '+Math.round((v.fileSize||0)/1024)+' KB'
+              +'</div>'
+              +'<div style="font-size:11px;color:var(--text-muted);">'+v.fileName+'</div>'
+            +'</div>'
+            +'<div style="display:flex;gap:6px;">'
+              +'<button class="btn btn-ghost btn-sm" onclick="openDocUrl(\''+v.fbKey+'\')" title="Otevřít tuto verzi">👁</button>'
+              +'<button class="btn btn-primary btn-sm" onclick="restoreDocVersion(\''+v.fbKey+'\');closeModal(\'modal-doc-detail\');" title="Obnovit jako aktuální">🔄 Obnovit</button>'
+            +'</div>'
+            +'</div>';
+        }).join('')
+      +'</div></div>';
+  }
+
   document.getElementById('doc-detail-title').textContent = fileIcon(d.fileName)+' '+d.name;
   document.getElementById('doc-detail-body').innerHTML =
     '<div style="display:flex;flex-direction:column;gap:14px;">'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
-      +'<div><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Kategorie</div>'
-        +'<span class="doc-card-cat">'+cat.icon+' '+cat.label+'</span></div>'
-      +'<div><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Datum nahrání</div>'
-        +'<div style="font-size:13px;">'+new Date(d.createdAt).toLocaleDateString('cs-CZ')+'</div></div>'
-      +(personName ? '<div><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Zaměstnanec</div><div style="font-size:13px;">👤 '+personName+'</div></div>' : '')
-      +'<div><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Velikost</div>'
-        +'<div style="font-size:13px;">'+Math.round((d.fileSize||0)/1024)+' KB</div></div>'
+
+    // ── Info sekce ──────────────────────────────────────
+    +'<div id="doc-detail-info">'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">'
+        +'<div><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Kategorie</div>'
+          +'<span class="doc-card-cat">'+catInfo.icon+' '+catInfo.label+'</span></div>'
+        +'<div><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Verze</div>'
+          +'<div style="font-size:13px;">'+verBadge+(d.version ? ' aktuální' : 'první verze')+'</div></div>'
+        +'<div><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Nahráno</div>'
+          +'<div style="font-size:13px;">'+new Date(d.createdAt).toLocaleDateString('cs-CZ')+'</div></div>'
+        +'<div><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Velikost</div>'
+          +'<div style="font-size:13px;">'+Math.round((d.fileSize||0)/1024)+' KB</div></div>'
+        +(personName ? '<div style="grid-column:1/-1"><div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Zaměstnanec</div><div style="font-size:13px;">👤 '+personName+'</div></div>' : '')
+      +'</div>'
+      +(d.desc ? '<div style="background:var(--bg3);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text-muted);margin-bottom:12px;">'+d.desc+'</div>' : '')
     +'</div>'
-    +(d.desc ? '<div style="background:var(--bg3);border-radius:8px;padding:12px;font-size:13px;color:var(--text-muted);">'+d.desc+'</div>' : '')
-    +'<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-      +'<button class="btn btn-primary" onclick="openDocUrl(\''+d.fbKey+'\')">👁 Otevřít / Stáhnout</button>'
+
+    // ── Formulář pro úpravu (skrytý) ─────────────────────
+    +'<div id="doc-edit-form" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;">'
+      +'<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">✏️ Upravit dokument</div>'
+      +'<div class="form-grid" style="gap:12px;">'
+        +'<div class="form-group full"><label class="form-label">Název</label>'
+          +'<input type="text" class="form-input" id="de-name" value="'+d.name.replace(/"/g,'&quot;')+'"></div>'
+        +'<div class="form-group"><label class="form-label">Kategorie</label>'
+          +'<select class="form-input" id="de-cat"></select></div>'
+        +'<div class="form-group full"><label class="form-label">Popis</label>'
+          +'<textarea class="form-input" id="de-desc" rows="2" style="resize:vertical;">'+(d.desc||'')+'</textarea></div>'
+
+        // Přiřazení zaměstnanců
+        +'<div class="form-group full">'
+          +'<label class="form-label">Přiřadit zaměstnancům</label>'
+          +'<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">'
+            +'<button type="button" id="de-btn-none" onclick="setDocPersonMode(\'none\')"'
+              +' style="padding:5px 13px;border-radius:7px;border:2px solid var(--primary);background:var(--primary);color:#fff;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;font-size:12px;cursor:pointer;">➖ Nikomu</button>'
+            +'<button type="button" id="de-btn-all" onclick="setDocPersonMode(\'all\')"'
+              +' style="padding:5px 13px;border-radius:7px;border:2px solid var(--border);background:transparent;color:var(--text-muted);font-family:\'Barlow Condensed\',sans-serif;font-weight:700;font-size:12px;cursor:pointer;">✅ Všichni</button>'
+            +'<button type="button" id="de-btn-select" onclick="setDocPersonMode(\'select\')"'
+              +' style="padding:5px 13px;border-radius:7px;border:2px solid var(--border);background:transparent;color:var(--text-muted);font-family:\'Barlow Condensed\',sans-serif;font-weight:700;font-size:12px;cursor:pointer;">👤 Výběr</button>'
+          +'</div>'
+          // Seznam checkboxů
+          +'<div id="de-person-list" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;max-height:200px;overflow-y:auto;">'
+            +'<div style="display:flex;gap:8px;margin-bottom:8px;">'
+              +'<button type="button" onclick="docSelectAll(true)" style="padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:var(--primary);color:#fff;font-size:11px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;cursor:pointer;">Vybrat vše</button>'
+              +'<button type="button" onclick="docSelectAll(false)" style="padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:11px;font-family:\'Barlow Condensed\',sans-serif;font-weight:700;cursor:pointer;">Zrušit výběr</button>'
+            +'</div>'
+            +'<div id="de-person-checkboxes">'
+              + people.map(function(p){
+                  var checked = (d.assignedTo && d.assignedTo[p.fbKey]) ? 'checked' : '';
+                  return '<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;">'
+                    +'<input type="checkbox" class="de-person-cb" value="'+p.fbKey+'" '+checked
+                      +' style="width:15px;height:15px;accent-color:var(--primary);cursor:pointer;flex-shrink:0;">'
+                    +'<div class="avatar" style="width:26px;height:26px;font-size:10px;flex-shrink:0;">'+initials(p.name)+'</div>'
+                    +'<div><div style="font-weight:600;color:var(--text);">'+p.name+'</div>'
+                      +'<div style="font-size:11px;color:var(--text-muted);">'+p.role+'</div></div>'
+                    +'</label>';
+                }).join('')
+            +'</div>'
+          +'</div>'
+          +'<div id="de-person-info" style="font-size:11px;color:var(--text-muted);margin-top:6px;"></div>'
+        +'</div>'
+
+      +'</div>'
+      +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">'
+        +'<button class="btn btn-ghost btn-sm" onclick="toggleDocEdit(false)">Zrušit</button>'
+        +'<button class="btn btn-primary btn-sm" onclick="saveDocEdit(\''+d.fbKey+'\')">💾 Uložit změny</button>'
+      +'</div>'
+    +'</div>'
+
+    // ── Tlačítka akcí ─────────────────────────────────────
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+      +'<button class="btn btn-primary" onclick="openDocUrl(\''+d.fbKey+'\')">👁 Otevřít</button>'
+      +'<button class="btn btn-ghost" onclick="toggleDocEdit(true)">✏️ Upravit</button>'
+      +'<button class="btn btn-ghost" onclick="openUploadNewVersion(\''+d.fbKey+'\')">📤 Nová verze</button>'
       +'<button class="btn btn-danger" onclick="deleteDoc(\''+d.fbKey+'\');closeModal(\'modal-doc-detail\');">🗑 Smazat</button>'
     +'</div>'
+
+    + histHtml
     +'</div>';
+
+  // Naplň select kategorií a nastav aktuální
+  buildDocCatSelect('de-cat', false);
+  setTimeout(function(){
+    var sel = document.getElementById('de-cat');
+    if (sel) sel.value = d.cat;
+    // Nastav výchozí mode přiřazení
+    if (!d.assignedTo && !d.personFbKey) {
+      setDocPersonMode('none');
+    } else if (d.assignedTo === 'all') {
+      setDocPersonMode('all');
+    } else {
+      setDocPersonMode('select');
+    }
+  }, 10);
+
   openModal('modal-doc-detail');
+}
+
+var _docPersonMode = 'none';
+
+function setDocPersonMode(mode) {
+  _docPersonMode = mode;
+  var list = document.getElementById('de-person-list');
+  var info = document.getElementById('de-person-info');
+  var btns = ['none','all','select'];
+  btns.forEach(function(m) {
+    var btn = document.getElementById('de-btn-'+m);
+    if (!btn) return;
+    if (m === mode) {
+      btn.style.background = 'var(--primary)';
+      btn.style.color = '#fff';
+      btn.style.borderColor = 'var(--primary)';
+    } else {
+      btn.style.background = 'transparent';
+      btn.style.color = 'var(--text-muted)';
+      btn.style.borderColor = 'var(--border)';
+    }
+  });
+  if (mode === 'none') {
+    if (list) list.style.display = 'none';
+    if (info) info.textContent = 'Dokument nebude přiřazen žádnému zaměstnanci';
+  } else if (mode === 'all') {
+    if (list) list.style.display = 'none';
+    if (info) info.textContent = '✅ Dokument bude přiřazen všem zaměstnancům ('+people.length+')';
+  } else {
+    if (list) list.style.display = 'block';
+    updateDocPersonCount();
+  }
+}
+
+function updateDocPersonCount() {
+  var checked = document.querySelectorAll('.de-person-cb:checked').length;
+  var info = document.getElementById('de-person-info');
+  if (info) info.textContent = 'Vybráno: '+checked+' z '+people.length+' zaměstnanců';
+}
+
+function docSelectAll(val) {
+  document.querySelectorAll('.de-person-cb').forEach(function(cb){ cb.checked = val; });
+  updateDocPersonCount();
+}
+
+function toggleDocEdit(show) {
+  var info = document.getElementById('doc-detail-info');
+  var form = document.getElementById('doc-edit-form');
+  if (!info || !form) return;
+  info.style.display = show ? 'none' : '';
+  form.style.display = show ? '' : 'none';
+}
+
+function saveDocEdit(fbKey) {
+  var name = document.getElementById('de-name').value.trim();
+  var cat  = document.getElementById('de-cat').value;
+  var desc = document.getElementById('de-desc').value.trim();
+  if (!name) { showNotif('Zadejte název dokumentu', true); return; }
+
+  // Zpracuj přiřazení zaměstnanců
+  var assignedTo = null;
+  if (_docPersonMode === 'all') {
+    assignedTo = 'all';
+  } else if (_docPersonMode === 'select') {
+    var checked = document.querySelectorAll('.de-person-cb:checked');
+    if (checked.length > 0) {
+      assignedTo = {};
+      checked.forEach(function(cb){ assignedTo[cb.value] = true; });
+    }
+  }
+
+  var updates = {};
+  updates['documents/'+fbKey+'/name']       = name;
+  updates['documents/'+fbKey+'/cat']        = cat;
+  updates['documents/'+fbKey+'/desc']       = desc;
+  updates['documents/'+fbKey+'/assignedTo'] = assignedTo;
+  updates['documents/'+fbKey+'/personFbKey']= null; // staré pole — vynuluj
+  updates['documents/'+fbKey+'/editedAt']   = Date.now();
+
+  db.ref().update(updates).then(function(){
+    closeModal('modal-doc-detail');
+    var countMsg = assignedTo === 'all' ? 'všichni' : assignedTo ? Object.keys(assignedTo).length+' zaměstnanců' : 'nikdo';
+    showNotif('✅ Dokument upraven — přiřazeno: '+countMsg);
+  }).catch(function(e){ showNotif('❌ Chyba: '+e.message, true); });
 }
 
 function deleteDoc(fbKey) {
@@ -1928,8 +2586,8 @@ function printCard(fbKey) {
 
   var rows = trainingTypes.map(function(t) {
     var date = p.trainings[t.id] || null;
-    var s    = getStatus(date);
-    var exp  = date ? addYears(date, VALIDITY_YEARS) : null;
+    var s    = getStatus(date, t);
+    var exp  = date ? getExpiryDate(date, t) : null;
     var diff = exp ? daysDiff(exp) : null;
     var daysStr = '';
     if (diff !== null) {
@@ -2025,11 +2683,25 @@ window.selectColor      = selectColor;
 window.handleFileUpload = handleFileUpload;
 window.filterPeople     = filterPeople;
 window.filterByStatus   = filterByStatus;
+window.filterByType     = filterByType;
+window.clearPeopleFilters = clearPeopleFilters;
+window.updateFilterUI   = updateFilterUI;
 window.setTrainingMode  = setTrainingMode;
 window.selectAllPeople  = selectAllPeople;
 window.updateSelectedCount = updateSelectedCount;
 window.printCard        = printCard;
-window.openUploadForType = openUploadForType;
+window.updateValidityPreview = updateValidityPreview;
+window.setValidityQuick      = setValidityQuick;
+window.updateDocPicker  = updateDocPicker;
+window.onDocPickChange  = onDocPickChange;
+window.toggleDocEdit        = toggleDocEdit;
+window.saveDocEdit          = saveDocEdit;
+window.setDocPersonMode     = setDocPersonMode;
+window.docSelectAll         = docSelectAll;
+window.updateDocPersonCount = updateDocPersonCount;
+window.restoreDocVersion    = restoreDocVersion;
+window.openUploadNewVersion = openUploadNewVersion;
+window.openUploadForType    = openUploadForType;
 window.renderTypeAttachments = renderTypeAttachments;
 window.onDocFileSelected= onDocFileSelected;
 window.uploadDocument   = uploadDocument;
