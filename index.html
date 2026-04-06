@@ -583,12 +583,12 @@
 
 <div class="notif" id="notif"></div>
 
-<script type="module">
-// ─── FIREBASE SETUP ───────────────────────────────────────────────────
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, get, remove, onValue, push }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+<!-- Firebase compat CDN — funguje bez import/module -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
+<script>
+// ─── FIREBASE SETUP ───────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyCngZ7woRCjNJKJozrz3091FJQRMweINdY",
   authDomain: "damco-jaromer-skoleni.firebaseapp.com",
@@ -599,8 +599,8 @@ const firebaseConfig = {
   appId: "1:847241205611:web:32edd8eb191bba9ceade2e"
 };
 
-const app = initializeApp(firebaseConfig);
-const db  = getDatabase(app);
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
 // ─── LOADING OVERLAY ──────────────────────────────────────────────────
 function setLoading(on) {
@@ -641,21 +641,20 @@ let nextPersonId = Date.now(); // unique ID base
 async function fbSavePeople() {
   const obj = {};
   people.forEach(p => { obj[p.fbKey || p.id] = p; });
-  await set(ref(db, 'people'), obj);
+  await db.ref('people').set(obj);
 }
 
 async function fbSaveTypes() {
-  await set(ref(db, 'trainingTypes'), trainingTypes);
+  await db.ref('trainingTypes').set(trainingTypes);
 }
 
 async function fbDeletePerson(fbKey) {
-  await remove(ref(db, 'people/' + fbKey));
+  await db.ref('people/' + fbKey).remove();
 }
 
 // Live sync — whenever DB changes, update UI
 function startLiveSync() {
-  // People
-  onValue(ref(db, 'people'), snap => {
+  db.ref('people').on('value', snap => {
     const data = snap.val();
     if (data) {
       people = Object.entries(data).map(([key, p]) => ({ ...p, fbKey: key }));
@@ -666,15 +665,13 @@ function startLiveSync() {
     refreshCurrentPage();
   });
 
-  // Training types
-  onValue(ref(db, 'trainingTypes'), snap => {
+  db.ref('trainingTypes').on('value', snap => {
     const data = snap.val();
     if (data && Array.isArray(data) && data.length > 0) {
       trainingTypes = data;
-    } else if (data && typeof data === 'object') {
+    } else if (data && typeof data === 'object' && !Array.isArray(data)) {
       trainingTypes = Object.values(data);
     } else {
-      // First run — write defaults
       trainingTypes = DEFAULT_TYPES;
       fbSaveTypes();
     }
@@ -990,9 +987,9 @@ async function savePerson() {
     trainings, files:[], note: document.getElementById('p-note').value.trim()
   };
   try {
-    const newRef = push(ref(db, 'people'));
+    const newRef = db.ref('people').push();
     newPerson.fbKey = newRef.key;
-    await set(newRef, newPerson);
+    await newRef.set(newPerson);
     closeModal('modal-person');
     showNotif('✅ Osoba přidána — ' + name);
   } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
@@ -1025,7 +1022,7 @@ async function saveTraining() {
   if (!person) return;
   person.trainings[type] = date;
   try {
-    await set(ref(db, 'people/' + (person.fbKey||person.id)), person);
+    await db.ref('people/' + (person.fbKey||person.id)).set(person);
     closeModal('modal-training');
     showNotif('✅ Školení uloženo');
   } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
@@ -1070,7 +1067,7 @@ async function updatePerson() {
   p.note  = document.getElementById('ep-note').value.trim();
   trainingTypes.forEach(t => { p.trainings[t.id] = document.getElementById('epf-'+t.id)?.value || null; });
   try {
-    await set(ref(db, 'people/' + fbKey), p);
+    await db.ref('people/' + fbKey).set(p);
     closeModal('modal-edit-person');
     showNotif('✅ Změny uloženy — ' + name);
   } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
@@ -1082,7 +1079,7 @@ async function deletePerson() {
   if (!p) return;
   if (!confirm(`Opravdu smazat osobu "${p.name}"? Tato akce je nevratná.`)) return;
   try {
-    await remove(ref(db, 'people/' + fbKey));
+    await db.ref('people/' + fbKey).remove();
     closeModal('modal-edit-person');
     showNotif('🗑 Osoba odstraněna');
   } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
@@ -1154,7 +1151,7 @@ async function saveType() {
     showNotif('✅ Nový typ přidán: ' + name);
   }
   try {
-    await fbSaveTypes();
+    await db.ref('trainingTypes').set(trainingTypes);
     closeModal('modal-type');
   } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
 }
@@ -1165,7 +1162,7 @@ async function deleteType(typeId) {
   if (!confirm(`Opravdu smazat typ "${t?.name}"?`)) return;
   trainingTypes = trainingTypes.filter(x=>x.id!==typeId);
   try {
-    await fbSaveTypes();
+    await db.ref('trainingTypes').set(trainingTypes);
     showNotif('🗑 Typ odstraněn');
   } catch(e) { showNotif('❌ Chyba: ' + e.message, true); }
 }
@@ -1196,28 +1193,6 @@ document.querySelectorAll('.modal-bg').forEach(bg => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') document.querySelectorAll('.modal-bg.open').forEach(bg => bg.classList.remove('open'));
 });
-
-// ─── MAKE FUNCTIONS GLOBAL (needed for onclick in HTML) ───────────────
-window.showPage        = showPage;
-window.showTypeDetail  = showTypeDetail;
-window.openAddPerson   = openAddPerson;
-window.openEditPerson  = openEditPerson;
-window.openAddTraining = openAddTraining;
-window.openEditTraining= openEditTraining;
-window.openAddType     = openAddType;
-window.openEditType    = openEditType;
-window.deleteType      = deleteType;
-window.deletePerson    = deletePerson;
-window.savePerson      = savePerson;
-window.saveTraining    = saveTraining;
-window.updatePerson    = updatePerson;
-window.saveType        = saveType;
-window.closeModal      = closeModal;
-window.selectIcon      = selectIcon;
-window.selectColor     = selectColor;
-window.handleFileUpload= handleFileUpload;
-window.filterPeople    = filterPeople;
-window.filterByStatus  = filterByStatus;
 
 // ─── INIT ─────────────────────────────────────────────────────────────
 document.getElementById('todayDate').textContent =
