@@ -471,6 +471,9 @@
     <!-- FILTER BAR -->
     <div class="filter-bar" style="flex-wrap:wrap;gap:10px;margin-bottom:10px;">
       <input type="text" class="search-input" placeholder="🔍 Hledat jméno nebo pozici…" oninput="filterPeople(this.value)" style="min-width:180px;flex:1;">
+      <select class="filter-select" id="filter-role-select" onchange="filterByRole(this.value)" style="min-width:150px;">
+        <option value="">Všechny pozice</option>
+      </select>
       <select class="filter-select" id="filter-type-select" onchange="filterByType(this.value)" style="min-width:160px;">
         <option value="">Všechna školení</option>
       </select>
@@ -1374,6 +1377,7 @@ function renderDashboard() {
 var _filterText   = '';
 var _filterStatus = '';
 var _filterType   = '';
+var _filterRole   = '';
 
 function buildTypeFilterSelect() {
   var sel = document.getElementById('filter-type-select');
@@ -1386,25 +1390,47 @@ function buildTypeFilterSelect() {
   if (cur) sel.value = cur;
 }
 
-function filterPeople(v) { _filterText = v.toLowerCase(); renderPeople(); updateFilterUI(); }
-function filterByStatus(v) { _filterStatus = v; renderPeople(); updateFilterUI(); }
-function filterByType(v) { _filterType = v; renderPeople(); updateFilterUI(); }
+function buildRoleFilterSelect() {
+  var sel = document.getElementById('filter-role-select');
+  if (!sel) return;
+  var cur = sel.value;
+  var roles = [];
+  people.forEach(function(p) {
+    var r = (p.role||'').trim();
+    if (r && roles.indexOf(r) === -1) roles.push(r);
+  });
+  roles.sort(function(a,b){ return a.localeCompare(b,'cs'); });
+  sel.innerHTML = '<option value="">Všechny pozice</option>'
+    + roles.map(function(r){ return '<option value="'+r+'">'+r+'</option>'; }).join('');
+  if (cur && roles.indexOf(cur) > -1) sel.value = cur;
+}
+
+function filterPeople(v)  { _filterText = v.toLowerCase(); renderPeople(); updateFilterUI(); }
+function filterByStatus(v){ _filterStatus = v; renderPeople(); updateFilterUI(); }
+function filterByType(v)  { _filterType = v; renderPeople(); updateFilterUI(); }
+function filterByRole(v)  { _filterRole = v; renderPeople(); updateFilterUI(); }
 
 function clearPeopleFilters() {
-  _filterText = ''; _filterStatus = ''; _filterType = '';
+  _filterText = ''; _filterStatus = ''; _filterType = ''; _filterRole = '';
   var inp = document.querySelector('#page-people .search-input');
   if (inp) inp.value = '';
-  var ts = document.getElementById('filter-type-select'); if (ts) ts.value = '';
+  var rs = document.getElementById('filter-role-select');   if (rs) rs.value = '';
+  var ts = document.getElementById('filter-type-select');   if (ts) ts.value = '';
   var ss = document.getElementById('filter-status-select'); if (ss) ss.value = '';
   renderPeople(); updateFilterUI();
 }
 
 function updateFilterUI() {
-  var hasF = _filterText || _filterStatus || _filterType;
+  var hasF = _filterText || _filterStatus || _filterType || _filterRole;
   var cb = document.getElementById('filter-clear-btn');
   if (cb) cb.style.display = hasF ? '' : 'none';
 
   var chips = [];
+  if (_filterRole) {
+    chips.push('<span style="background:var(--primary-light);border:1px solid var(--primary);border-radius:20px;padding:3px 12px;font-size:12px;font-weight:600;color:var(--primary);">'
+      +'👷 '+_filterRole
+      +' <span onclick="filterByRole(\'\');var s=document.getElementById(\'filter-role-select\');if(s)s.value=\'\';" style="cursor:pointer;margin-left:4px;opacity:0.6;">✕</span></span>');
+  }
   if (_filterType) {
     var t = trainingTypes.find(function(x){ return x.id===_filterType; });
     if (t) chips.push('<span style="background:var(--primary-light);border:1px solid var(--primary);border-radius:20px;padding:3px 12px;font-size:12px;font-weight:600;color:var(--primary);">'
@@ -1429,14 +1455,18 @@ function updateFilterUI() {
 function renderPeople() {
   normalizeTrainings();
   buildTypeFilterSelect();
+  buildRoleFilterSelect();
 
   var list = people.slice();
 
-  // Textový filtr
   if (_filterText) list = list.filter(function(p){
     return (p.name||'').toLowerCase().indexOf(_filterText)>-1
         || (p.role||'').toLowerCase().indexOf(_filterText)>-1
         || (p.dept||'').toLowerCase().indexOf(_filterText)>-1;
+  });
+
+  if (_filterRole) list = list.filter(function(p){
+    return (p.role||'').trim() === _filterRole;
   });
 
   // Kombinovaný filtr: typ + stav
@@ -1453,7 +1483,7 @@ function renderPeople() {
 
   // Výsledkový počet
   var ie = document.getElementById('filter-result-info');
-  if (ie) ie.textContent = (_filterText||_filterStatus||_filterType) ? 'Zobrazeno: '+list.length+' z '+people.length+' zaměstnanců' : '';
+  if (ie) ie.textContent = (_filterText||_filterStatus||_filterType||_filterRole) ? 'Zobrazeno: '+list.length+' z '+people.length+' zaměstnanců' : '';
 
   var segMap = {ok:'done',expiring:'warn',expired:'overdue',missing:'miss'};
 
@@ -2681,11 +2711,12 @@ window.closeModal       = closeModal;
 window.selectIcon       = selectIcon;
 window.selectColor      = selectColor;
 window.handleFileUpload = handleFileUpload;
-window.filterPeople     = filterPeople;
-window.filterByStatus   = filterByStatus;
-window.filterByType     = filterByType;
+window.filterPeople       = filterPeople;
+window.filterByStatus     = filterByStatus;
+window.filterByType       = filterByType;
+window.filterByRole       = filterByRole;
 window.clearPeopleFilters = clearPeopleFilters;
-window.updateFilterUI   = updateFilterUI;
+window.updateFilterUI     = updateFilterUI;
 window.setTrainingMode  = setTrainingMode;
 window.selectAllPeople  = selectAllPeople;
 window.updateSelectedCount = updateSelectedCount;
